@@ -146,14 +146,11 @@ impl Reducer {
                 for (_, meo) in tx.produces() {
                     self.process_produced_txo(&meo, epoch_no, output)?;
                 }
-
             }
-
         }
 
         Ok(())
     }
-
 }
 
 impl Config {
