@@ -149,20 +149,22 @@ impl Reducer {
                                             let mut policy_wrap_map = serde_json::Map::new();
                                             let mut asset_wrap_map = serde_json::Map::new();
 
+                                            let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
+
                                             let asset_map = kv_pairs_to_hashmap(&asset_contents);
                                             asset_wrap_map.insert(asset_name_str.to_string(), serde_json::Value::Object(asset_map));
                                             policy_wrap_map.insert(policy_id_str.to_string(), serde_json::Value::Object(asset_wrap_map));
                                             std_wrap_map.insert(CIP25_META.to_string(), serde_json::Value::Object(policy_wrap_map));
                                             metadata.insert("metadata".to_string(), serde_json::Value::Object(std_wrap_map));
                                             metadata.insert("last_minted".to_string(), serde_json::Value::Number(
-                                                serde_json::Number::from(self.time.slot_to_wallclock(block.slot().to_owned()))
+                                                serde_json::Number::from(timestamp)
                                             ));
 
                                             if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
                                                 let metadata_crdt = model::CRDTCommand::LastWriteWins(
                                                     format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), fingerprint_str),
                                                     model::Value::String(json_string.to_owned()),
-                                                    self.time.slot_to_wallclock(block.slot().to_owned())
+                                                    timestamp
                                                 );
 
                                                 let asset_index_crdt = model::CRDTCommand::SetAdd(
