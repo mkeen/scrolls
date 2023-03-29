@@ -159,9 +159,10 @@ impl Reducer {
                                             ));
 
                                             if let Ok(json_string) = serde_json::to_string_pretty(&metadata) {
-                                                let metadata_crdt = model::CRDTCommand::AnyWriteWins(
+                                                let metadata_crdt = model::CRDTCommand::LastWriteWins(
                                                     format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), fingerprint_str),
                                                     model::Value::String(json_string.to_owned()),
+                                                    self.time.slot_to_wallclock(block.slot().to_owned())
                                                 );
 
                                                 let asset_index_crdt = model::CRDTCommand::SetAdd(
