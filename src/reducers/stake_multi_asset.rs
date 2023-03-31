@@ -164,29 +164,26 @@ impl Reducer {
         for asset in tx_output.assets() {
             match asset {
                 Asset::NativeAsset(policy_id, asset_name, quantity) => {
-                    if self.is_policy_id_accepted(&policy_id) {
-                        let (fingerprint, multi_asset) = MultiAssetSingleAgg::new(
-                            policy_id,
-                            hex::encode(asset_name).as_str(),
-                            quantity,
-                            tx_hash,
-                            tx_index,
-                        ).unwrap();
+                    let (fingerprint, multi_asset) = MultiAssetSingleAgg::new(
+                        policy_id,
+                        hex::encode(asset_name).as_str(),
+                        quantity,
+                        tx_hash,
+                        tx_index,
+                    ).unwrap();
 
 
-                        let mut map = serde_json::Map::new();
-                        map.insert(fingerprint, serde_json::Value::String(self.stake_or_address(&address).to_string()));
+                    let mut map = serde_json::Map::new();
+                    map.insert(fingerprint, serde_json::Value::String(self.stake_or_address(&address).to_string()));
 
-                        let last_activity_crdt = model::CRDTCommand::LastWriteWins(
-                            format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), policy_id),
-                            Value::Json(serde_json::Value::from(map)),
-                            *timestamp,
-                        );
+                    let last_activity_crdt = model::CRDTCommand::LastWriteWins(
+                        format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), policy_id),
+                        Value::Json(serde_json::Value::from(map)),
+                        *timestamp,
+                    );
 
-                        log::error!("sending");
-                        output.send(gasket::messaging::Message::from(last_activity_crdt))?;
-
-                    }
+                    log::error!("sending");
+                    output.send(gasket::messaging::Message::from(last_activity_crdt))?;
 
                 }
                 _ => {}
