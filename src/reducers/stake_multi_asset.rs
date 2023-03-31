@@ -182,7 +182,7 @@ impl Reducer {
                         *timestamp,
                     );
 
-                    log::error!("sending");
+                    log::error!("sending {}", "hi");
                     output.send(gasket::messaging::Message::from(last_activity_crdt))?;
 
                 }
