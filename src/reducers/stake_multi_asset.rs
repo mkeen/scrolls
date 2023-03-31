@@ -105,15 +105,13 @@ pub struct Config {
 
 pub struct Reducer {
     config: Config,
-    policy: crosscut::policies::RuntimePolicy,
     chain: crosscut::ChainWellKnownInfo,
-    policy_ids: Option<Vec<Hash<28>>>,
     time: crosscut::time::NaiveProvider,
 }
 
 impl Reducer {
     fn config_key(&self, subject: String, epoch_no: u64) -> String {
-        let def_key_prefix = "asset_holders_by_asset_id";
+        let def_key_prefix = "cardano-policy-asset-ownership";
 
         match &self.config.aggr_by {
             Some(aggr_type) if matches!(aggr_type, AggrType::Epoch) => {
@@ -128,13 +126,6 @@ impl Reducer {
                     None => format!("{}.{}", def_key_prefix.to_string(), subject),
                 };
             }
-        };
-    }
-
-    fn is_policy_id_accepted(&self, policy_id: &Hash<28>) -> bool {
-        return match &self.policy_ids {
-            Some(pids) => pids.contains(&policy_id),
-            None => true,
         };
     }
 
@@ -176,6 +167,8 @@ impl Reducer {
                     let mut map = serde_json::Map::new();
                     map.insert(fingerprint, serde_json::Value::String(self.stake_or_address(&address).to_string()));
 
+                    log::error!("sending {}", "hello");
+
                     let last_activity_crdt = model::CRDTCommand::LastWriteWins(
                         format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), policy_id),
                         Value::Json(serde_json::Value::from(map)),
@@ -200,11 +193,9 @@ impl Reducer {
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         for (tx_index, tx) in block.txs().into_iter().enumerate() {
-            if filter_matches!(self, block, &tx, ctx) {
-                let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
-                for (_, meo) in tx.produces() {
-                    self.process_produced_txo(&meo, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output)?;
-                }
+            let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
+            for (_, meo) in tx.produces() {
+                self.process_produced_txo(&meo, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output)?;
             }
         }
 
@@ -216,25 +207,10 @@ impl Config {
     pub fn plugin(
         self,
         chain: &crosscut::ChainWellKnownInfo,
-        policy: &crosscut::policies::RuntimePolicy,
     ) -> super::Reducer {
-        let policy_ids: Option<Vec<Hash<28>>> = match &self.policy_ids_hex {
-            Some(pids) => {
-                let ps = pids
-                    .iter()
-                    .map(|pid| Hash::<28>::from_str(pid).expect("invalid policy_id"))
-                    .collect();
-
-                Some(ps)
-            }
-            None => None,
-        };
-
         let reducer = Reducer {
             config: self,
             chain: chain.clone(),
-            policy: policy.clone(),
-            policy_ids: policy_ids.clone(),
             time: crosscut::time::NaiveProvider::new(chain.clone()),
         };
 
