@@ -155,6 +155,8 @@ impl Reducer {
         for asset in tx_output.assets() {
             match asset {
                 Asset::NativeAsset(policy_id, asset_name, quantity) => {
+                    log::info!("asset {}", "there is an asset trust me");
+
                     let (fingerprint, multi_asset) = MultiAssetSingleAgg::new(
                         policy_id,
                         hex::encode(asset_name).as_str(),
