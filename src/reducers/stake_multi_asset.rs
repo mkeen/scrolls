@@ -153,6 +153,8 @@ impl Reducer {
         let address = tx_output.address().or_panic()?;
 
         for asset in tx_output.assets() {
+            log::info!("asset {}", "there is an asset trust me");
+
             match asset {
                 Asset::NativeAsset(policy_id, asset_name, quantity) => {
                     log::info!("asset {}", "there is an asset trust me");
