@@ -147,50 +147,45 @@ impl Reducer {
         tx_hash: &str,
         tx_index: i64,
         output: &mut super::OutputPort,
+        stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
-        let address = tx_output.address().or_panic()?;
-        log::error!("getting stake");
-        if let Some(stake_or_address) = self.stake_or_address_from_address(&address) {
-            log::error!("got stake");
-            for asset in tx_output.assets() {
-                match asset {
-                    Asset::NativeAsset(policy_id, asset_name, quantity) => {
-                        log::error!("adding asset to shared wallet {}", stake_or_address);
-                        let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
-                        match asset_result {
-                            Ok(asset_name) => {
-                                let (fingerprint, _) = MultiAssetSingleAgg::new(
-                                    policy_id,
-                                    asset_name.as_str(),
-                                    quantity,
-                                    tx_hash,
-                                    tx_index,
-                                ).unwrap();
+        for asset in tx_output.assets() {
+            match asset {
+                Asset::NativeAsset(policy_id, asset_name, quantity) => {
+                    log::error!("adding asset to shared wallet {}", stake_or_address);
+                    let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
+                    match asset_result {
+                        Ok(asset_name) => {
+                            let (fingerprint, _) = MultiAssetSingleAgg::new(
+                                policy_id,
+                                asset_name.as_str(),
+                                quantity,
+                                tx_hash,
+                                tx_index,
+                            ).unwrap();
 
-                                let total_asset_count = model::CRDTCommand::PNCounter(
-                                    format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
-                                    quantity as i64
-                                );
+                            let total_asset_count = model::CRDTCommand::PNCounter(
+                                format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
+                                quantity as i64
+                            );
 
-                                output.send(gasket::messaging::Message::from(total_asset_count))?;
+                            output.send(gasket::messaging::Message::from(total_asset_count))?;
 
-                                let wallet_history = model::CRDTCommand::SetAdd(
-                                    format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
-                                    fingerprint
-                                );
+                            let wallet_history = model::CRDTCommand::SetAdd(
+                                format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
+                                fingerprint
+                            );
 
-                                output.send(wallet_history.into());
-                            },
+                            output.send(wallet_history.into());
+                        },
 
-                            _ => ()
-                        }
-
+                        _ => ()
                     }
 
-                    _ => {}
-                };
+                }
 
-            }
+                _ => {}
+            };
 
         }
 
@@ -204,41 +199,38 @@ impl Reducer {
         tx_hash: &str,
         tx_index: i64,
         output: &mut super::OutputPort,
+        stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
-        let address = tx_input.address().or_panic()?;
-        if let Some(stake_or_address) = self.stake_or_address_from_address(&address) {
-            for asset in tx_input.assets() {
-                match asset {
-                    Asset::NativeAsset(policy_id, asset_name, quantity) => {
-                        log::error!("removing asset from shared wallet {}", stake_or_address);
-                        let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
-                        match asset_result {
-                            Ok(asset_name) => {
-                                let (fingerprint, _) = MultiAssetSingleAgg::new(
-                                    policy_id,
-                                    asset_name.as_str(),
-                                    quantity,
-                                    tx_hash,
-                                    tx_index,
-                                ).unwrap();
+        for asset in tx_input.assets() {
+            match asset {
+                Asset::NativeAsset(policy_id, asset_name, quantity) => {
+                    log::error!("removing asset from shared wallet {}", stake_or_address);
+                    let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
+                    match asset_result {
+                        Ok(asset_name) => {
+                            let (fingerprint, _) = MultiAssetSingleAgg::new(
+                                policy_id,
+                                asset_name.as_str(),
+                                quantity,
+                                tx_hash,
+                                tx_index,
+                            ).unwrap();
 
-                                let total_asset_count = model::CRDTCommand::PNCounter(
-                                    format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
-                                    -1 * quantity as i64
-                                );
+                            let total_asset_count = model::CRDTCommand::PNCounter(
+                                format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
+                                -1 * quantity as i64
+                            );
 
-                                output.send(total_asset_count.into());
-                            },
-                            _ => ()
-
-                        }
+                            output.send(total_asset_count.into());
+                        },
+                        _ => ()
 
                     }
 
-                    _ => {}
-                };
+                }
 
-            }
+                _ => {}
+            };
 
         }
 
@@ -254,11 +246,23 @@ impl Reducer {
         for (tx_index, tx) in block.txs().into_iter().enumerate() {
             let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
             for (_, meo) in tx.produces() {
-                self.process_produced_txo(&meo, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output)?;
+                if let Ok(address) = meo.address() {
+                    if let Some(stake_or_address) = self.stake_or_address_from_address(&address) {
+                        self.process_produced_txo(&meo, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address);
+                    }
+
+                }
+
+
             }
 
             for (_, mei) in ctx.find_consumed_txos(&tx, &self.policy).or_panic()? {
-                self.process_spent_txo(&mei, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output)?;
+                if let Ok(address) = mei.address() {
+                    if let Some(stake_or_address) = self.stake_or_address_from_address(&address) {
+                        self.process_spent_txo(&mei, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address);
+                    }
+                }
+
             }
 
         }
