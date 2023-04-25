@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use pallas::ledger::traverse::{Asset, MultiEraOutput};
+use pallas::ledger::traverse::{Asset, MultiEraInput, MultiEraOutput};
 use pallas::ledger::traverse::{MultiEraBlock, OutputRef};
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +12,7 @@ use bech32::{ToBase32, Variant, Error};
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
 use pallas::ledger::addresses::{Address, StakeAddress};
+use pallas::ledger::primitives::alonzo::TransactionInput;
 use pallas::ledger::primitives::babbage::{Coin, Multiasset};
 use crate::model::Value;
 use crate::reducers::utxo_by_stake::any_address_to_stake_bech32;
@@ -195,6 +196,60 @@ impl Reducer {
         Ok(())
     }
 
+    // fn process_spent_txo(
+    //     &mut self,
+    //     tx_input: &MultiEraInput,
+    //     timestamp: &u64,
+    //     tx_hash: &str,
+    //     tx_index: i64,
+    //     output: &mut super::OutputPort,
+    // ) -> Result<(), gasket::error::Error> {
+    //     let address = tx_input.
+    //         .address()
+    //         .map(|addr| addr.to_string())
+    //         .or_panic()?;
+    //
+    //     let address = tx_output.address().or_panic()?;
+    //
+    //     for asset in tx_output.assets() {
+    //         log::info!("asset {}", "there is an asset trust me");
+    //
+    //         match asset {
+    //             Asset::NativeAsset(policy_id, asset_name, quantity) => {
+    //                 log::info!("asset {}", "there is an asset trust me");
+    //
+    //                 let (fingerprint, multi_asset) = MultiAssetSingleAgg::new(
+    //                     policy_id,
+    //                     hex::encode(asset_name).as_str(),
+    //                     quantity,
+    //                     tx_hash,
+    //                     tx_index,
+    //                 ).unwrap();
+    //
+    //
+    //                 let mut map = serde_json::Map::new();
+    //                 map.insert(fingerprint, serde_json::Value::String(self.stake_or_address(&address).to_string()));
+    //
+    //                 log::error!("sending {}", "hello");
+    //
+    //                 let last_activity_crdt = model::CRDTCommand::LastWriteWins(
+    //                     format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), self.stake_or_address(&address).to_string()),
+    //                     Value::Json(serde_json::Value::from(map)),
+    //                     *timestamp,
+    //                 );
+    //
+    //                 log::error!("sending {}", "hi");
+    //                 output.send(gasket::messaging::Message::from(last_activity_crdt))?;
+    //
+    //             }
+    //
+    //             _ => {}
+    //         };
+    //     }
+    //
+    //     Ok(())
+    // }
+
     pub fn reduce_block<'b>(
         &mut self,
         block: &'b MultiEraBlock<'b>,
@@ -203,6 +258,10 @@ impl Reducer {
     ) -> Result<(), gasket::error::Error> {
         for (tx_index, tx) in block.txs().into_iter().enumerate() {
             let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
+            // for (_, mei) in tx.inputs() {
+            //     self.process_spent_txo(&mei, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output)?;
+            // }
+
             for (_, meo) in tx.produces() {
                 self.process_produced_txo(&meo, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output)?;
             }
