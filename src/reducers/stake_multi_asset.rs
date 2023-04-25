@@ -250,8 +250,8 @@ impl Reducer {
 impl Config {
     pub fn plugin(
         self,
-        policy: &crosscut::policies::RuntimePolicy,
         chain: &crosscut::ChainWellKnownInfo,
+        policy: &crosscut::policies::RuntimePolicy,
     ) -> super::Reducer {
         let reducer = Reducer {
             config: self,
