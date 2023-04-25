@@ -153,22 +153,29 @@ impl Reducer {
                 match asset {
                     Asset::NativeAsset(policy_id, asset_name, quantity) => {
                         log::error!("adding asset to shared wallet {}", stake_or_address);
+                        let asset_name = &hex::encode(asset_name).as_str().to_string();
 
                         let (fingerprint, _) = MultiAssetSingleAgg::new(
                             policy_id,
-                            hex::encode(asset_name).as_str(),
+                            asset_name.as_str(),
                             quantity,
                             tx_hash,
                             tx_index,
                         ).unwrap();
 
-                        let last_activity_crdt = model::CRDTCommand::TwoPhaseSetAdd(
-                            format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
+                        let total_asset_count = model::CRDTCommand::PNCounter(
+                            format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, asset_name),
+                            quantity as i64
+                        );
+
+                        output.send(gasket::messaging::Message::from(total_asset_count))?;
+
+                        let wallet_history = model::CRDTCommand::GrowOnlySetAdd(
+                            format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
                             fingerprint
                         );
 
-                        output.send(gasket::messaging::Message::from(last_activity_crdt))?;
-
+                        output.send(gasket::messaging::Message::from(wallet_history))?;
                     }
 
                     _ => {}
@@ -195,6 +202,7 @@ impl Reducer {
                 match asset {
                     Asset::NativeAsset(policy_id, asset_name, quantity) => {
                         log::error!("removing asset from shared wallet {}", stake_or_address);
+                        let asset_name = &hex::encode(asset_name).as_str().to_string();
 
                         let (fingerprint, _) = MultiAssetSingleAgg::new(
                             policy_id,
@@ -204,13 +212,12 @@ impl Reducer {
                             tx_index,
                         ).unwrap();
 
-                        let last_activity_crdt = model::CRDTCommand::TwoPhaseSetRemove(
-                            format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
-                            fingerprint
+                        let total_asset_count = model::CRDTCommand::PNCounter(
+                            format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, asset_name),
+                            -1 * quantity as i64
                         );
 
-                        output.send(gasket::messaging::Message::from(last_activity_crdt))?;
-
+                        output.send(gasket::messaging::Message::from(total_asset_count))?;
                     }
 
                     _ => {}
