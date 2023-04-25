@@ -48,8 +48,6 @@ impl MultiAssetSingleAgg {
 
         }
 
-
-
     }
 
 }
@@ -183,6 +181,7 @@ impl Reducer {
                     output.send(gasket::messaging::Message::from(last_activity_crdt))?;
 
                 }
+
                 _ => {}
             };
         }
@@ -201,10 +200,12 @@ impl Reducer {
             for (_, meo) in tx.produces() {
                 self.process_produced_txo(&meo, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output)?;
             }
+
         }
 
         Ok(())
     }
+
 }
 
 impl Config {
@@ -220,4 +221,5 @@ impl Config {
 
         super::Reducer::StakeMultiAsset(reducer)
     }
+
 }
