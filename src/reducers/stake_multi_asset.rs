@@ -138,7 +138,7 @@ impl Reducer {
     fn stake_or_address(&self, address: &Address) -> String {
         match any_address_to_stake_bech32(address.to_owned()) {
             Some(stake_key) => stake_key,
-            _ => address.to_bech32().unwrap().to_owned()
+            _ => address.to_bech32().unwrap().to_string().to_owned()
         }
 
     }
