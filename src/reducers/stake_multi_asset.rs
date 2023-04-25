@@ -164,7 +164,7 @@ impl Reducer {
                         ).unwrap();
 
                         let total_asset_count = model::CRDTCommand::PNCounter(
-                            format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, asset_name),
+                            format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
                             quantity as i64
                         );
 
@@ -206,14 +206,14 @@ impl Reducer {
 
                         let (fingerprint, _) = MultiAssetSingleAgg::new(
                             policy_id,
-                            hex::encode(asset_name).as_str(),
+                            asset_name,
                             quantity,
                             tx_hash,
                             tx_index,
                         ).unwrap();
 
                         let total_asset_count = model::CRDTCommand::PNCounter(
-                            format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, asset_name),
+                            format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
                             -1 * quantity as i64
                         );
 
