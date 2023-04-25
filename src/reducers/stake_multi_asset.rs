@@ -162,7 +162,7 @@ impl Reducer {
                             tx_index,
                         ).unwrap();
 
-                        let last_activity_crdt = model::CRDTCommand::SetAdd(
+                        let last_activity_crdt = model::CRDTCommand::TwoPhaseSetAdd(
                             format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
                             fingerprint
                         );
@@ -204,7 +204,7 @@ impl Reducer {
                             tx_index,
                         ).unwrap();
 
-                        let last_activity_crdt = model::CRDTCommand::SetRemove(
+                        let last_activity_crdt = model::CRDTCommand::TwoPhaseSetRemove(
                             format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
                             fingerprint
                         );
