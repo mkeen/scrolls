@@ -110,6 +110,17 @@ pub struct Reducer {
     time: crosscut::time::NaiveProvider,
 }
 
+fn any_address_to_stake_bech32(address: Address) -> Option<String> {
+    match address {
+        Address::Shelley(s) => match StakeAddress::try_from(s).ok() {
+            Some(x) => x.to_bech32().ok(),
+            _ => None,
+        },
+        Address::Byron(_) => None,
+        Address::Stake(_) => None,
+    }
+}
+
 impl Reducer {
     fn config_key(&self, subject: String, epoch_no: u64) -> String {
         let def_key_prefix = "cardano-policy-asset-ownership";

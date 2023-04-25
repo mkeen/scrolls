@@ -16,7 +16,7 @@ pub struct Reducer {
     policy: crosscut::policies::RuntimePolicy,
 }
 
-pub fn any_address_to_stake_bech32(address: Address) -> Option<String> {
+fn any_address_to_stake_bech32(address: Address) -> Option<String> {
     match address {
         Address::Shelley(s) => match StakeAddress::try_from(s).ok() {
             Some(x) => x.to_bech32().ok(),
