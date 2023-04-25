@@ -43,6 +43,7 @@ pub mod utxos_by_asset;
 pub mod addresses_by_stake;
 #[cfg(feature = "unstable")]
 pub mod asset_metadata;
+#[cfg(feature = "unstable")]
 pub mod stake_multi_asset;
 
 #[derive(Deserialize)]
