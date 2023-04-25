@@ -1,3 +1,4 @@
+use std::panic;
 use pallas::ledger::traverse::{Asset, MultiEraOutput};
 use pallas::ledger::traverse::{MultiEraBlock};
 use serde::{Deserialize, Serialize};
@@ -153,29 +154,36 @@ impl Reducer {
                 match asset {
                     Asset::NativeAsset(policy_id, asset_name, quantity) => {
                         log::error!("adding asset to shared wallet {}", stake_or_address);
-                        let asset_name = &hex::encode(asset_name).as_str().to_string();
+                        let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
+                        match asset_result {
+                            Ok(asset_name) => {
+                                let (fingerprint, _) = MultiAssetSingleAgg::new(
+                                    policy_id,
+                                    asset_name.as_str(),
+                                    quantity,
+                                    tx_hash,
+                                    tx_index,
+                                ).unwrap();
 
-                        let (fingerprint, _) = MultiAssetSingleAgg::new(
-                            policy_id,
-                            asset_name.as_str(),
-                            quantity,
-                            tx_hash,
-                            tx_index,
-                        ).unwrap();
+                                let total_asset_count = model::CRDTCommand::PNCounter(
+                                    format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
+                                    quantity as i64
+                                );
 
-                        let total_asset_count = model::CRDTCommand::PNCounter(
-                            format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
-                            quantity as i64
-                        );
+                                output.send(gasket::messaging::Message::from(total_asset_count))?;
 
-                        output.send(gasket::messaging::Message::from(total_asset_count))?;
+                                let wallet_history = model::CRDTCommand::GrowOnlySetAdd(
+                                    format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
+                                    fingerprint
+                                );
 
-                        let wallet_history = model::CRDTCommand::GrowOnlySetAdd(
-                            format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
-                            fingerprint
-                        );
+                                output.send(gasket::messaging::Message::from(wallet_history))?;
+                            },
 
-                        output.send(gasket::messaging::Message::from(wallet_history))?;
+                            _ => ()
+                        }
+
+
                     }
 
                     _ => {}
@@ -202,22 +210,28 @@ impl Reducer {
                 match asset {
                     Asset::NativeAsset(policy_id, asset_name, quantity) => {
                         log::error!("removing asset from shared wallet {}", stake_or_address);
-                        let asset_name = &hex::encode(asset_name).as_str().to_string();
+                        let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
+                        match asset_result {
+                            Ok(asset_name) => {
+                                let (fingerprint, _) = MultiAssetSingleAgg::new(
+                                    policy_id,
+                                    asset_name.as_str(),
+                                    quantity,
+                                    tx_hash,
+                                    tx_index,
+                                ).unwrap();
 
-                        let (fingerprint, _) = MultiAssetSingleAgg::new(
-                            policy_id,
-                            asset_name,
-                            quantity,
-                            tx_hash,
-                            tx_index,
-                        ).unwrap();
+                                let total_asset_count = model::CRDTCommand::PNCounter(
+                                    format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
+                                    -1 * quantity as i64
+                                );
 
-                        let total_asset_count = model::CRDTCommand::PNCounter(
-                            format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
-                            -1 * quantity as i64
-                        );
+                                output.send(gasket::messaging::Message::from(total_asset_count))?;
+                            },
+                            _ => ()
 
-                        output.send(gasket::messaging::Message::from(total_asset_count))?;
+                        }
+
                     }
 
                     _ => {}
