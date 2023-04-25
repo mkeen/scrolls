@@ -172,16 +172,11 @@ impl Reducer {
                         tx_index,
                     ).unwrap();
 
-
-                    let mut map = serde_json::Map::new();
-                    map.insert(fingerprint, serde_json::Value::String(self.stake_or_address(&address).to_string()));
-
                     log::error!("sending {}", "hello");
 
-                    let last_activity_crdt = model::CRDTCommand::LastWriteWins(
+                    let last_activity_crdt = model::CRDTCommand::SetAdd(
                         format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), self.stake_or_address(&address).to_string()),
-                        Value::Json(serde_json::Value::from(map)),
-                        *timestamp,
+                        fingerprint
                     );
 
                     log::error!("sending {}", "hi");
