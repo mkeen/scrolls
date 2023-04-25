@@ -149,10 +149,10 @@ impl Reducer {
         output: &mut super::OutputPort,
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
+        log::error!("got stake or addr {}", stake_or_address);
         for asset in tx_output.assets() {
             match asset {
                 Asset::NativeAsset(policy_id, asset_name, quantity) => {
-                    log::error!("adding asset to shared wallet {}", stake_or_address);
                     let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
                     match asset_result {
                         Ok(asset_name) => {
@@ -201,10 +201,10 @@ impl Reducer {
         output: &mut super::OutputPort,
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
+        log::error!("got stake or addr {}", stake_or_address);
         for asset in tx_input.assets() {
             match asset {
                 Asset::NativeAsset(policy_id, asset_name, quantity) => {
-                    log::error!("removing asset from shared wallet {}", stake_or_address);
                     let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
                     match asset_result {
                         Ok(asset_name) => {
