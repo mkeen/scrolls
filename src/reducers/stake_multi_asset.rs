@@ -179,7 +179,7 @@ impl Reducer {
                                     fingerprint
                                 );
 
-                                output.send(gasket::messaging::Message::from(wallet_history))?;
+                                output.send(wallet_history.into());
                             },
 
                             _ => ()
@@ -227,7 +227,7 @@ impl Reducer {
                                     -1 * quantity as i64
                                 );
 
-                                output.send(gasket::messaging::Message::from(total_asset_count))?;
+                                output.send(total_asset_count.into());
                             },
                             _ => ()
 
