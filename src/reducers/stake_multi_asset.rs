@@ -86,6 +86,7 @@ fn asset_fingerprint(
 #[derive(Deserialize, Copy, Clone)]
 pub enum AggrType {
     Epoch,
+
 }
 
 #[derive(Deserialize)]
