@@ -149,7 +149,9 @@ impl Reducer {
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         let address = tx_output.address().or_panic()?;
+        log::error!("getting stake");
         if let Some(stake_or_address) = self.stake_or_address_from_address(&address) {
+            log::error!("got stake");
             for asset in tx_output.assets() {
                 match asset {
                     Asset::NativeAsset(policy_id, asset_name, quantity) => {
@@ -182,7 +184,6 @@ impl Reducer {
 
                             _ => ()
                         }
-
 
                     }
 
@@ -252,7 +253,6 @@ impl Reducer {
     ) -> Result<(), gasket::error::Error> {
         for (tx_index, tx) in block.txs().into_iter().enumerate() {
             let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
-
             for (_, meo) in tx.produces() {
                 self.process_produced_txo(&meo, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output)?;
             }
