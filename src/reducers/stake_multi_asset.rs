@@ -15,7 +15,6 @@ use pallas::ledger::addresses::{Address, StakeAddress};
 use pallas::ledger::primitives::alonzo::TransactionInput;
 use pallas::ledger::primitives::babbage::{Coin, Multiasset};
 use crate::model::Value;
-use crate::reducers::utxo_by_stake::any_address_to_stake_bech32;
 
 #[derive(Serialize, Deserialize)]
 struct MultiAssetSingleAgg {
