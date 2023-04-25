@@ -1,20 +1,14 @@
-use std::collections::HashMap;
-use pallas::ledger::traverse::{Asset, MultiEraInput, MultiEraOutput};
-use pallas::ledger::traverse::{MultiEraBlock, OutputRef};
+use pallas::ledger::traverse::{Asset, MultiEraOutput};
+use pallas::ledger::traverse::{MultiEraBlock};
 use serde::{Deserialize, Serialize};
 
 use crate::{crosscut, model, prelude::*};
 use pallas::crypto::hash::Hash;
 
-use crate::crosscut::epochs::block_epoch;
-use std::str::FromStr;
 use bech32::{ToBase32, Variant, Error};
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
 use pallas::ledger::addresses::{Address, StakeAddress};
-use pallas::ledger::primitives::alonzo::TransactionInput;
-use pallas::ledger::primitives::babbage::{Coin, Multiasset};
-use crate::model::Value;
 
 #[derive(Serialize, Deserialize)]
 struct MultiAssetSingleAgg {
@@ -109,17 +103,6 @@ pub struct Reducer {
     time: crosscut::time::NaiveProvider,
 }
 
-fn any_address_to_stake_bech32(address: Address) -> Option<String> {
-    match address {
-        Address::Shelley(s) => match StakeAddress::try_from(s).ok() {
-            Some(x) => x.to_bech32().ok(),
-            _ => Ok(address.to_bech32())
-        },
-        Address::Byron(_) => None,
-        Address::Stake(_) => None,
-    }
-}
-
 impl Reducer {
     fn config_key(&self, subject: String, epoch_no: u64) -> String {
         let def_key_prefix = "cardano-policy-asset-ownership";
@@ -145,12 +128,15 @@ impl Reducer {
 
     }
 
-    fn stake_or_address(&self, address: &Address) -> String {
-        match any_address_to_stake_bech32(address.to_owned()) {
-            Some(stake_key) => stake_key,
-            _ => address.to_bech32().unwrap().to_string().to_owned()
+    fn stake_or_address_from_address(&self, address: &Address) -> Option<String> {
+        match address {
+            Address::Shelley(s) => match StakeAddress::try_from(s.clone()).ok() {
+                Some(x) => x.to_bech32().ok(),
+                _ => address.to_bech32().ok(),
+            },
+            Address::Byron(_) => address.to_bech32().ok(),
+            Address::Stake(_) => address.to_bech32().ok(),
         }
-
     }
 
     fn process_produced_txo(
@@ -162,32 +148,34 @@ impl Reducer {
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         let address = tx_output.address().or_panic()?;
-        let stake_or_address = self.stake_or_address(&address).to_string();
+        if let Some(stake_or_address) = self.stake_or_address_from_address(&address) {
+            for asset in tx_output.assets() {
+                match asset {
+                    Asset::NativeAsset(policy_id, asset_name, quantity) => {
+                        log::error!("adding asset to shared wallet {}", stake_or_address);
 
-        for asset in tx_output.assets() {
-            match asset {
-                Asset::NativeAsset(policy_id, asset_name, quantity) => {
-                    log::error!("adding asset to shared wallet {}", stake_or_address);
+                        let (fingerprint, multi_asset) = MultiAssetSingleAgg::new(
+                            policy_id,
+                            hex::encode(asset_name).as_str(),
+                            quantity,
+                            tx_hash,
+                            tx_index,
+                        ).unwrap();
 
-                    let (fingerprint, multi_asset) = MultiAssetSingleAgg::new(
-                        policy_id,
-                        hex::encode(asset_name).as_str(),
-                        quantity,
-                        tx_hash,
-                        tx_index,
-                    ).unwrap();
+                        let last_activity_crdt = model::CRDTCommand::SetAdd(
+                            format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
+                            fingerprint
+                        );
 
-                    let last_activity_crdt = model::CRDTCommand::SetAdd(
-                        format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
-                        fingerprint
-                    );
+                        output.send(gasket::messaging::Message::from(last_activity_crdt))?;
 
-                    output.send(gasket::messaging::Message::from(last_activity_crdt))?;
+                    }
 
-                }
+                    _ => {}
+                };
 
-                _ => {}
-            };
+            }
+
         }
 
         Ok(())
@@ -202,7 +190,7 @@ impl Reducer {
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         let address = tx_input.address().or_panic()?;
-        let stake_or_address = self.stake_or_address(&address).to_string();
+        let stake_or_address = self.stake_or_address_from_address(&address).to_string();
 
         for asset in tx_input.assets() {
             match asset {
