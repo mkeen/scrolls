@@ -82,7 +82,7 @@ pub enum Config {
     #[cfg(feature = "unstable")]
     AssetMetadata(asset_metadata::Config),
     #[cfg(feature = "unstable")]
-    StakeMultiAsset(asset_metadata::Config),
+    StakeMultiAsset(stake_multi_asset::Config),
 }
 
 impl Config {
