@@ -117,14 +117,19 @@ impl Reducer {
                     Some(prefix) => format!("{}.{}.{}", prefix, subject, epoch_no),
                     None => format!("{}.{}", def_key_prefix.to_string(), subject),
                 };
+
             }
+
             _ => {
                 return match &self.config.key_prefix {
                     Some(prefix) => format!("{}.{}", prefix, subject),
                     None => format!("{}.{}", def_key_prefix.to_string(), subject),
                 };
+
             }
+
         };
+
     }
 
     fn stake_or_address(&self, address: &Address) -> String {
@@ -172,7 +177,7 @@ impl Reducer {
                     log::error!("sending {}", "hello");
 
                     let last_activity_crdt = model::CRDTCommand::LastWriteWins(
-                        format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), policy_id),
+                        format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), self.stake_or_address(&address).to_string()),
                         Value::Json(serde_json::Value::from(map)),
                         *timestamp,
                     );
