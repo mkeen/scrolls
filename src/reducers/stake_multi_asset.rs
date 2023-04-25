@@ -154,7 +154,7 @@ impl Reducer {
                     Asset::NativeAsset(policy_id, asset_name, quantity) => {
                         log::error!("adding asset to shared wallet {}", stake_or_address);
 
-                        let (fingerprint, multi_asset) = MultiAssetSingleAgg::new(
+                        let (fingerprint, _) = MultiAssetSingleAgg::new(
                             policy_id,
                             hex::encode(asset_name).as_str(),
                             quantity,
@@ -190,32 +190,34 @@ impl Reducer {
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         let address = tx_input.address().or_panic()?;
-        let stake_or_address = self.stake_or_address_from_address(&address).to_string();
+        if let Some(stake_or_address) = self.stake_or_address_from_address(&address) {
+            for asset in tx_input.assets() {
+                match asset {
+                    Asset::NativeAsset(policy_id, asset_name, quantity) => {
+                        log::error!("removing asset from shared wallet {}", stake_or_address);
 
-        for asset in tx_input.assets() {
-            match asset {
-                Asset::NativeAsset(policy_id, asset_name, quantity) => {
-                    log::error!("removing asset from shared wallet {}", stake_or_address);
+                        let (fingerprint, _) = MultiAssetSingleAgg::new(
+                            policy_id,
+                            hex::encode(asset_name).as_str(),
+                            quantity,
+                            tx_hash,
+                            tx_index,
+                        ).unwrap();
 
-                    let (fingerprint, multi_asset) = MultiAssetSingleAgg::new(
-                        policy_id,
-                        hex::encode(asset_name).as_str(),
-                        quantity,
-                        tx_hash,
-                        tx_index,
-                    ).unwrap();
+                        let last_activity_crdt = model::CRDTCommand::SetRemove(
+                            format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
+                            fingerprint
+                        );
 
-                    let last_activity_crdt = model::CRDTCommand::SetRemove(
-                        format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
-                        fingerprint
-                    );
+                        output.send(gasket::messaging::Message::from(last_activity_crdt))?;
 
-                    output.send(gasket::messaging::Message::from(last_activity_crdt))?;
+                    }
 
-                }
+                    _ => {}
+                };
 
-                _ => {}
-            };
+            }
+
         }
 
         Ok(())
