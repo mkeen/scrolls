@@ -113,7 +113,7 @@ fn any_address_to_stake_bech32(address: Address) -> Option<String> {
     match address {
         Address::Shelley(s) => match StakeAddress::try_from(s).ok() {
             Some(x) => x.to_bech32().ok(),
-            _ => None,
+            _ => Ok(address.to_bech32())
         },
         Address::Byron(_) => None,
         Address::Stake(_) => None,
