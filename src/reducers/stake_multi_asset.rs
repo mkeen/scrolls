@@ -163,13 +163,12 @@ impl Reducer {
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         let address = tx_output.address().or_panic()?;
+        let stake_or_address = self.stake_or_address(&address).to_string();
 
         for asset in tx_output.assets() {
-            log::info!("asset {}", "there is an asset trust me");
-
             match asset {
                 Asset::NativeAsset(policy_id, asset_name, quantity) => {
-                    log::info!("asset {}", "there is an asset trust me");
+                    log::error!("adding asset to shared wallet {}", stake_or_address);
 
                     let (fingerprint, multi_asset) = MultiAssetSingleAgg::new(
                         policy_id,
@@ -180,11 +179,10 @@ impl Reducer {
                     ).unwrap();
 
                     let last_activity_crdt = model::CRDTCommand::SetAdd(
-                        format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), self.stake_or_address(&address).to_string()),
+                        format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
                         fingerprint
                     );
 
-                    log::error!("sending {}", "hi");
                     output.send(gasket::messaging::Message::from(last_activity_crdt))?;
 
                 }
@@ -205,10 +203,13 @@ impl Reducer {
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         let address = tx_input.address().or_panic()?;
+        let stake_or_address = self.stake_or_address(&address).to_string();
 
         for asset in tx_input.assets() {
             match asset {
                 Asset::NativeAsset(policy_id, asset_name, quantity) => {
+                    log::error!("removing asset from shared wallet {}", stake_or_address);
+
                     let (fingerprint, multi_asset) = MultiAssetSingleAgg::new(
                         policy_id,
                         hex::encode(asset_name).as_str(),
@@ -218,7 +219,7 @@ impl Reducer {
                     ).unwrap();
 
                     let last_activity_crdt = model::CRDTCommand::SetRemove(
-                        format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), self.stake_or_address(&address).to_string()),
+                        format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
                         fingerprint
                     );
 
