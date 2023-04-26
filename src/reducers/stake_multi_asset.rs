@@ -158,23 +158,23 @@ impl Reducer {
                     ).unwrap();
 
                     if !fingerprint.is_empty() {
-                        let total_asset_count = model::CRDTCommand::PNCounter(
-                            format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
-                            quantity as i64
-                        );
-
-                        if let Ok(total_asset_count_message) = total_asset_count.try_into() {
-                            output.send(total_asset_count_message)?;
-                        }
-
-                        let wallet_history = model::CRDTCommand::SetAdd(
-                            format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
-                            fingerprint
-                        );
-
-                        if let Ok(wallet_history_message) = wallet_history.try_into() {
-                            output.send(wallet_history_message)?;
-                        }
+                        // let total_asset_count = model::CRDTCommand::PNCounter(
+                        //     format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
+                        //     quantity as i64
+                        // );
+                        //
+                        // if let Ok(total_asset_count_message) = total_asset_count.try_into() {
+                        //     output.send(total_asset_count_message)?;
+                        // }
+                        //
+                        // let wallet_history = model::CRDTCommand::SetAdd(
+                        //     format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
+                        //     fingerprint
+                        // );
+                        //
+                        // if let Ok(wallet_history_message) = wallet_history.try_into() {
+                        //     output.send(wallet_history_message)?;
+                        // }
 
                     }
 
