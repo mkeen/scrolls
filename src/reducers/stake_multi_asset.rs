@@ -158,23 +158,23 @@ impl Reducer {
                     ).unwrap();
 
                     if !fingerprint.is_empty() {
-                        // let total_asset_count = model::CRDTCommand::PNCounter(
-                        //     format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
-                        //     quantity as i64
-                        // );
-                        //
-                        // if let Ok(total_asset_count_message) = total_asset_count.try_into() {
-                        //     output.send(total_asset_count_message)?;
-                        // }
-                        //
-                        // let wallet_history = model::CRDTCommand::SetAdd(
-                        //     format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
-                        //     fingerprint
-                        // );
-                        //
-                        // if let Ok(wallet_history_message) = wallet_history.try_into() {
-                        //     output.send(wallet_history_message)?;
-                        // }
+                        let total_asset_count = model::CRDTCommand::PNCounter(
+                            format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
+                            quantity as i64
+                        );
+
+                        if let Ok(total_asset_count_message) = total_asset_count.try_into() {
+                            output.send(total_asset_count_message)?;
+                        }
+
+                        let wallet_history = model::CRDTCommand::SetAdd(
+                            format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
+                            fingerprint
+                        );
+
+                        if let Ok(wallet_history_message) = wallet_history.try_into() {
+                            output.send(wallet_history_message)?;
+                        }
 
                     }
 
@@ -197,35 +197,35 @@ impl Reducer {
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
         log::error!("got stake or addr {}", stake_or_address);
-        for asset in tx_input.assets() {
-            if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
-                let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
-                if let Ok(asset_name) = asset_result {
-                    let (fingerprint, _) = MultiAssetSingleAgg::new(
-                        policy_id,
-                        asset_name.as_str(),
-                        quantity,
-                        tx_hash,
-                        tx_index,
-                    ).unwrap();
-
-                    if !fingerprint.is_empty() {
-                        let total_asset_count = model::CRDTCommand::PNCounter(
-                            format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
-                            -1 * quantity as i64
-                        );
-
-                        if let Ok(total_asset_count_message) = total_asset_count.try_into() {
-                            output.send(total_asset_count_message)?;
-                        }
-
-                    }
-
-                }
-
-            };
-
-        }
+        // for asset in tx_input.assets() {
+        //     if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
+        //         let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
+        //         if let Ok(asset_name) = asset_result {
+        //             let (fingerprint, _) = MultiAssetSingleAgg::new(
+        //                 policy_id,
+        //                 asset_name.as_str(),
+        //                 quantity,
+        //                 tx_hash,
+        //                 tx_index,
+        //             ).unwrap();
+        //
+        //             if !fingerprint.is_empty() {
+        //                 let total_asset_count = model::CRDTCommand::PNCounter(
+        //                     format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
+        //                     -1 * quantity as i64
+        //                 );
+        //
+        //                 if let Ok(total_asset_count_message) = total_asset_count.try_into() {
+        //                     output.send(total_asset_count_message)?;
+        //                 }
+        //
+        //             }
+        //
+        //         }
+        //
+        //     };
+        //
+        // }
 
         Ok(())
     }
