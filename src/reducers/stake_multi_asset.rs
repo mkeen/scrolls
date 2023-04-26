@@ -251,7 +251,10 @@ impl Reducer {
             for (_, mei) in ctx.find_consumed_txos(&tx, &self.policy).or_panic()? {
                 if let Ok(address) = mei.address() {
                     let stake_or_address = self.stake_or_address_from_address(&address);
-                    self.process_spent_txo(&mei, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address);
+                    if stake_or_address.len() > 0 {
+                        self.process_spent_txo(&mei, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address);
+                    }
+
                 }
 
             }
