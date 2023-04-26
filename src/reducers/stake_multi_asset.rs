@@ -163,7 +163,7 @@ impl Reducer {
                             quantity as i64
                         );
 
-                        error!("{}", format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint));
+                        error!("we ready {} {}", stake_or_address, fingerprint);
 
                         output.send(total_asset_count.into())?;
 
