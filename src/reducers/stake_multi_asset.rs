@@ -239,11 +239,9 @@ impl Reducer {
             let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
             for (_, meo) in tx.produces() {
                 if let Ok(address) = meo.address() {
+                    if address.
                     let stake_or_address = self.stake_or_address_from_address(&address);
                     self.process_produced_txo(&meo, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address)?;
-                } else {
-                    let stub_soa = "";
-                    self.process_produced_txo(&meo, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stub_soa.to_string()).expect("TODO: panic message");
                 }
 
             }
