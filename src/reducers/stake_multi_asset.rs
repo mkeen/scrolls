@@ -169,7 +169,7 @@ impl Reducer {
                                 quantity as i64
                             );
 
-                            output.send(gasket::messaging::Message::from(total_asset_count.into()));
+                            output.send(total_asset_count.into());
 
                             let wallet_history = model::CRDTCommand::SetAdd(
                                 format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
