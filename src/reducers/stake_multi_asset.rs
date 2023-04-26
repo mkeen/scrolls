@@ -144,7 +144,6 @@ impl Reducer {
         output: &mut super::OutputPort,
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
-        log::error!("got stake or addr {}", stake_or_address);
         for asset in tx_output.assets() {
             if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
                 let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
@@ -167,14 +166,14 @@ impl Reducer {
                             output.send(total_asset_count_message)?;
                         }
 
-                        let wallet_history = model::CRDTCommand::SetAdd(
-                            format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
-                            fingerprint
-                        );
-
-                        if let Ok(wallet_history_message) = wallet_history.try_into() {
-                            output.send(wallet_history_message)?;
-                        }
+                        // let wallet_history = model::CRDTCommand::SetAdd(
+                        //     format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
+                        //     fingerprint
+                        // );
+                        //
+                        // if let Ok(wallet_history_message) = wallet_history.try_into() {
+                        //     output.send(wallet_history_message)?;
+                        // }
 
                     }
 
@@ -196,7 +195,6 @@ impl Reducer {
         output: &mut super::OutputPort,
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
-        log::error!("got stake or addr {}", stake_or_address);
         // for asset in tx_input.assets() {
         //     if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
         //         let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
