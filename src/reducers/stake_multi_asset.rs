@@ -89,11 +89,6 @@ pub struct Config {
     pub key_prefix: Option<String>,
     pub filter: Option<crosscut::filters::Predicate>,
     pub aggr_by: Option<AggrType>,
-
-    /// Policies to match
-    ///
-    /// If specified only those policy ids as hex will be taken into account, if
-    /// not all policy ids will be indexed.
     pub policy_ids_hex: Option<Vec<String>>,
 }
 
@@ -254,7 +249,7 @@ impl Reducer {
 
             }
 
-            for (_, mei) in ctx.find_consumed_txos(&tx, &self.policy).or_panic()? {
+            for (_, mei) in ctx.find_consumed_txos(&tx, &self.policy).unwrap_or_default() {
                 if let Ok(address) = mei.address() {
                     let stake_or_address = self.stake_or_address_from_address(&address);
                     if stake_or_address.len() > 0 {
