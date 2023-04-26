@@ -129,9 +129,9 @@ impl Reducer {
 
     }
 
-    fn stake_or_address_from_address(address: &Address) -> String {
+    fn stake_or_address_from_address(&self, address: &Address) -> String {
         match address {
-            Address::Shelley(s) => match StakeAddress::try_from(s).ok() {
+            Address::Shelley(s) => match StakeAddress::try_from(*s).ok() {
                 Some(x) => x.to_bech32().unwrap_or_else(|_| String::new()),
                 _ => address.to_bech32().unwrap_or_else(|_| String::new()),
             },
@@ -248,7 +248,7 @@ impl Reducer {
             let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
             for (_, meo) in tx.produces() {
                 if let Ok(address) = meo.address() {
-                    let stake_or_address = self.stake_or_address_from_address(address);
+                    let stake_or_address = self.stake_or_address_from_address(&address);
                     self.process_produced_txo(&meo, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address);
                 }
 
@@ -257,7 +257,7 @@ impl Reducer {
 
             for (_, mei) in ctx.find_consumed_txos(&tx, &self.policy).or_panic()? {
                 if let Ok(address) = mei.address() {
-                    let stake_or_address = self.stake_or_address_from_address(address);
+                    let stake_or_address = self.stake_or_address_from_address(&address);
                     self.process_spent_txo(&mei, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address);
                 }
 
