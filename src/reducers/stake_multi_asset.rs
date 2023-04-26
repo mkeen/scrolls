@@ -129,7 +129,7 @@ impl Reducer {
 
     }
 
-    fn stake_or_address_from_address(&self, address: Address) -> String {
+    fn stake_or_address_from_address(address: &Address) -> String {
         match address {
             Address::Shelley(s) => match StakeAddress::try_from(s).ok() {
                 Some(x) => x.to_bech32().unwrap_or_else(|_| String::new()),
