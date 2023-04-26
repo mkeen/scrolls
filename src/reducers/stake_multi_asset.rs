@@ -9,6 +9,7 @@ use pallas::crypto::hash::Hash;
 use bech32::{ToBase32, Variant, Error};
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
+use log::error;
 use pallas::ledger::addresses::{Address, StakeAddress};
 
 #[derive(Serialize, Deserialize)]
@@ -157,14 +158,14 @@ impl Reducer {
                     ).unwrap();
 
                     if !fingerprint.is_empty() && !stake_or_address.is_empty() {
-                        // let total_asset_count = model::CRDTCommand::PNCounter(
-                        //     format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
-                        //     quantity as i64
-                        // );
-                        //
-                        // if let Ok(total_asset_count_message) = total_asset_count.try_into() {
-                        //     output.send(total_asset_count_message)?;
-                        // }
+                        let total_asset_count = model::CRDTCommand::PNCounter(
+                            format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
+                            quantity as i64
+                        );
+
+                        error!("{}", format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint));
+
+                        output.send(total_asset_count.into())?;
 
                         // let wallet_history = model::CRDTCommand::SetAdd(
                         //     format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
