@@ -29,11 +29,11 @@ impl MultiAssetSingleAgg {
     fn new(policy_id: Hash<28>, asset_name: &str, quantity: u64, tx_hash: &str, tx_index: i64) -> Result<(String, MultiAssetSingleAgg), &'static str> {
         match asset_fingerprint([
             hex::encode(policy_id).as_str(),
-            hex::encode(asset_name.clone()).as_str()
+            hex::encode(asset_name).as_str()
         ]) {
             Ok(fingerprint) => Ok((fingerprint.to_string(), MultiAssetSingleAgg {
                 policy_id: hex::encode(policy_id),
-                asset_name: hex::encode(asset_name.clone()),
+                asset_name: hex::encode(asset_name),
                 quantity: quantity.try_into().unwrap(),
                 fingerprint,
                 tx_hash: tx_hash.to_string(),
@@ -156,7 +156,7 @@ impl Reducer {
                         tx_index,
                     ).unwrap();
 
-                    if !fingerprint.is_empty() {
+                    if !fingerprint.is_empty() && !stake_or_address.is_empty() {
                         let total_asset_count = model::CRDTCommand::PNCounter(
                             format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
                             quantity as i64
