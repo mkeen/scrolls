@@ -12,6 +12,8 @@ use blake2::Blake2bVar;
 use log::error;
 use pallas::ledger::addresses::{Address, StakeAddress};
 
+use std::collections::HashMap;
+
 #[derive(Serialize, Deserialize)]
 struct MultiAssetSingleAgg {
     #[serde(rename = "policyId")]
@@ -145,6 +147,8 @@ impl Reducer {
         output: &mut super::OutputPort,
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
+        let mut fingerprint_tallies: HashMap<String, i64> = HashMap::new();
+
         for asset in tx_output.assets() {
             if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
                 let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
@@ -160,27 +164,24 @@ impl Reducer {
                     error!("quantity {}", quantity);
 
                     if !fingerprint.is_empty() && !stake_or_address.is_empty() {
-                        let total_asset_count = model::CRDTCommand::PNCounter(
-                            format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
-                            quantity as i64
-                        );
-
-                        output.send(total_asset_count.into())?;
-
-                        // let wallet_history = model::CRDTCommand::SetAdd(
-                        //     format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
-                        //     fingerprint
-                        // );
-                        //
-                        // if let Ok(wallet_history_message) = wallet_history.try_into() {
-                        //     output.send(wallet_history_message)?;
-                        // }
-
+                        *fingerprint_tallies.entry(fingerprint).or_insert(quantity as i64) += quantity as i64;
                     }
 
                 }
 
             };
+
+        }
+
+        for (fingerprint, quantity) in fingerprint_tallies {
+            let total_asset_count = model::CRDTCommand::PNCounter(
+                format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
+                quantity
+            );
+
+            if let Ok(total_asset_count_message) = total_asset_count.try_into() {
+                output.send(total_asset_count_message)?;
+            }
 
         }
 
