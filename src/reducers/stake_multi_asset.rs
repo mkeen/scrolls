@@ -10,6 +10,7 @@ use bech32::{ToBase32, Variant, Error};
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
 use pallas::ledger::addresses::{Address, StakeAddress};
+use crate::model::Value::String;
 
 #[derive(Serialize, Deserialize)]
 struct MultiAssetSingleAgg {
@@ -129,14 +130,18 @@ impl Reducer {
 
     }
 
-    fn stake_or_address_from_address(&self, address: &Address) -> Option<String> {
-        match address {
-            Address::Shelley(s) => match StakeAddress::try_from(s.clone()).ok() {
+    fn stake_or_address(address: Address) -> Option<String> {
+        let stake = match address {
+            Address::Shelley(s) => match StakeAddress::try_from(s).ok() {
                 Some(x) => x.to_bech32().ok(),
-                _ => address.to_bech32().ok(),
+                _ => None,
             },
-            Address::Byron(_) => address.to_bech32().ok(),
-            Address::Stake(_) => address.to_bech32().ok(),
+            Address::Byron(_) => None,
+            Address::Stake(_) => None,
+        };
+
+        if let a = Ok(stake) {
+
         }
     }
 
@@ -169,7 +174,7 @@ impl Reducer {
                                 quantity as i64
                             );
 
-                            output.send(gasket::messaging::Message::from(total_asset_count))?;
+                            output.send(gasket::messaging::Message::from(total_asset_count.into()));
 
                             let wallet_history = model::CRDTCommand::SetAdd(
                                 format!("stake-history-assets-{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
@@ -223,6 +228,7 @@ impl Reducer {
 
                             output.send(total_asset_count.into());
                         },
+
                         _ => ()
 
                     }
@@ -257,6 +263,7 @@ impl Reducer {
             }
 
             for (_, mei) in ctx.find_consumed_txos(&tx, &self.policy).or_panic()? {
+
                 if let Ok(address) = mei.address() {
                     if let Some(stake_or_address) = self.stake_or_address_from_address(&address) {
                         self.process_spent_txo(&mei, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address);
