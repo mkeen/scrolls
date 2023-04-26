@@ -130,18 +130,14 @@ impl Reducer {
 
     }
 
-    fn stake_or_address(address: Address) -> Option<String> {
-        let stake = match address {
+    fn stake_or_address(address: Address) -> Result<String> {
+        match address {
             Address::Shelley(s) => match StakeAddress::try_from(s).ok() {
-                Some(x) => x.to_bech32().ok(),
-                _ => None,
+                Some(x) => x.to_bech32(),
+                _ => address.to_bech32().unwrap(),
             },
-            Address::Byron(_) => None,
-            Address::Stake(_) => None,
-        };
-
-        if let a = Ok(stake) {
-
+            Address::Byron(_) => address.to_bech32(),
+            Address::Stake(_) => address.to_bech32(),
         }
     }
 
@@ -263,7 +259,6 @@ impl Reducer {
             }
 
             for (_, mei) in ctx.find_consumed_txos(&tx, &self.policy).or_panic()? {
-
                 if let Ok(address) = mei.address() {
                     if let Some(stake_or_address) = self.stake_or_address_from_address(&address) {
                         self.process_spent_txo(&mei, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address);
