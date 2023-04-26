@@ -163,8 +163,6 @@ impl Reducer {
                             quantity as i64
                         );
 
-                        error!("we ready {} {}", stake_or_address, fingerprint);
-
                         output.send(total_asset_count.into())?;
 
                         // let wallet_history = model::CRDTCommand::SetAdd(
