@@ -239,24 +239,24 @@ impl Reducer {
             for (_, meo) in tx.produces() {
                 if let Ok(address) = meo.address() {
                     let stake_or_address = self.stake_or_address_from_address(&address);
-                    if stake_or_address.len() > 0 {
-                        self.process_produced_txo(&meo, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address);
-                    }
-
+                    self.process_produced_txo(&meo, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address)?;
+                } else {
+                    let stub_soa = "";
+                    self.process_produced_txo(&meo, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stub_soa.to_string()).expect("TODO: panic message");
                 }
 
             }
 
-            for (_, mei) in ctx.find_consumed_txos(&tx, &self.policy).unwrap_or_default() {
-                if let Ok(address) = mei.address() {
-                    let stake_or_address = self.stake_or_address_from_address(&address);
-                    if stake_or_address.len() > 0 {
-                        self.process_spent_txo(&mei, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address);
-                    }
-
-                }
-
-            }
+            // for (_, mei) in ctx.find_consumed_txos(&tx, &self.policy).unwrap_or_default() {
+            //     if let Ok(address) = mei.address() {
+            //         let stake_or_address = self.stake_or_address_from_address(&address);
+            //         if stake_or_address.len() > 0 {
+            //             self.process_spent_txo(&mei, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address);
+            //         }
+            //
+            //     }
+            //
+            // }
 
         }
 
