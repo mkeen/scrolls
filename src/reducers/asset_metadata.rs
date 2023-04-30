@@ -180,7 +180,7 @@ impl Reducer {
 
                                                 match should_export_json {
                                                     true => {
-                                                        model::Value::Json(json!(metadata_final))
+                                                        model::Value::String(serde_json::to_string_pretty(&metadata_final).unwrap())
                                                     },
 
                                                     false => {
