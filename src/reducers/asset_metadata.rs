@@ -148,7 +148,7 @@ impl Reducer {
                             if let Some(policy_assets) = self.find_metadata_policy_assets(&policy_map, &policy_id_str) {
                                 // Identify the metadata items that are relevant to the current minted asset
                                 let filtered_policy_assets = policy_assets.iter().find(|(l, _)| {
-                                    let asset_label = self.get_asset_label(l.to_owned());
+                                    let asset_label = self.get_asset_label(l.clone().to_owned());
                                     asset_label.as_str() == &asset_name_str
                                 });
 
@@ -235,7 +235,6 @@ impl Reducer {
 
                                             }
 
-                                            continue
                                         }
 
                                     }
