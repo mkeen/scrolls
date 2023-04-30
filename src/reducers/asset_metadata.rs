@@ -235,6 +235,7 @@ impl Reducer {
 
                                             }
 
+                                            continue
                                         }
 
                                     }
