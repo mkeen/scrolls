@@ -178,12 +178,12 @@ impl Reducer {
                                                 asset_wrap_map.insert(asset_name_str.clone(), serde_json::Value::Object(asset_map));
                                                 policy_wrap_map.insert(policy_id_str.clone(), serde_json::Value::Object(asset_wrap_map));
                                                 std_wrap_map.insert(CIP25_META.to_string(), serde_json::Value::Object(policy_wrap_map));
-                                                metadata.insert("metadata".to_string(), serde_json::Value::Object(std_wrap_map));
+                                                metadata.insert("metadata".to_string(), serde_json::Value::Object(std_wrap_map.clone()));
                                                 metadata.insert("last_minted".to_string(), serde_json::Value::Number(
                                                     serde_json::Number::from(timestamp)
                                                 ));
 
-                                                if let Ok(json_string) = serde_json::to_string_pretty(&std_wrap_map.clone()) {
+                                                if let Ok(json_string) = serde_json::to_string_pretty(&std_wrap_map) {
                                                     if should_keep_historical_metadata {
                                                         output.send(model::CRDTCommand::AnyWriteWins(
                                                             format!("{}.{}", prefix, fingerprint_str),
