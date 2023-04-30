@@ -6,14 +6,16 @@ use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
 use hex::{self};
 use log::MetadataBuilder;
+use pallas::codec::minicbor::Encoder;
 
-use pallas::ledger::primitives::alonzo::{Metadata, Metadatum, MetadatumLabel};
+use pallas::ledger::primitives::alonzo::{AuxiliaryData, Metadata, Metadatum, MetadatumLabel, ShelleyMaAuxiliaryData};
 use pallas::ledger::traverse::{MultiEraBlock, MultiEraMeta, MultiEraTx};
 use pallas::codec::utils::{KeyValuePairs};
 use pallas::ledger::primitives::Fragment;
 
 use serde::Deserialize;
 use serde_json;
+use serde_json::json;
 
 use crate::{crosscut, model};
 
@@ -92,6 +94,26 @@ impl Reducer {
 
     }
 
+    fn get_wrapped_metadata_fragment(&self, asset_name: String, policy_id: String, asset_metadata: &KeyValuePairs<Metadatum, Metadatum>) -> ShelleyMaAuxiliaryData {
+        let asset_map = KeyValuePairs::from(
+            vec![(Metadatum::Text(asset_name), Metadatum::Map(asset_metadata.clone())); 1]
+        );
+
+        let policy_map = KeyValuePairs::from(
+            vec![(Metadatum::Text(policy_id.clone()), Metadatum::Map(asset_map))]
+        );
+
+        let meta_wrapper_721 = vec![(
+            MetadatumLabel::from(CIP25_META),
+            Metadatum::Map(policy_map.clone())
+        )];
+
+        ShelleyMaAuxiliaryData {
+            transaction_metadata: Metadata::from(meta_wrapper_721),
+            auxiliary_scripts: None,
+        }
+    }
+
     fn send(
         &mut self,
         block: &MultiEraBlock,
@@ -139,9 +161,9 @@ impl Reducer {
         if let Some(safe_mint) = tx.mint().as_alonzo() {
             for (policy_id, assets) in safe_mint.iter() {
                 let policy_id_str = hex::encode(policy_id);
-                let zero = 0;
+                let zero: &i64;
 
-                for (asset_name, _) in assets.iter().filter(|&(_, quantity)| quantity > &zero) {
+                for (asset_name, _) in assets.iter().filter(|&(_, quantity)| quantity > zero) {
                     if let Ok(asset_name_str) = String::from_utf8(asset_name.to_vec()) {
                         if let Some(policy_map) = tx.metadata().find(MetadatumLabel::from(CIP25_META)) {
                             if let Some(policy_assets) = self.find_metadata_policy_assets(&policy_map, &policy_id_str) {
@@ -156,67 +178,46 @@ impl Reducer {
                                         if let Ok(fingerprint_str) = self.asset_fingerprint([&policy_id_str.clone(), hex::encode(&asset_name_str).as_str()]) {
                                             let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
 
-                                            let main_meta_payload = {
+                                            let meta_payload = {
+                                                let metadata_final = self.get_wrapped_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_metadata);
+
                                                 match should_export_json {
                                                     true => {
-                                                        let asset_map = KeyValuePairs::from(
-                                                            vec![(asset_name_str, asset_metadata); 1]
-                                                        );
-
-                                                        let policy_map = KeyValuePairs::from(
-                                                            vec![(policy_id_str.clone(), asset_map)]
-                                                        );
-
-                                                        let meta_wrapper_721 = KeyValuePairs::from(vec![(
-                                                            CIP25_META,
-                                                            policy_map
-                                                        )]);
-
-                                                        match serde_json::to_string_pretty(&meta_wrapper_721) {
-                                                            Ok(json_string) => {
-                                                                Ok(model::Value::String(json_string))
-                                                            },
-                                                            Err(_) => Err("couldnt parse json"),
-                                                        }
-
+                                                        model::Value::Json(json!(metadata_final))
                                                     },
 
                                                     false => {
-                                                        match asset_metadata.encode_fragment() {
-                                                            Ok(binary_metadata) => {
-                                                                Ok(model::Value::Cbor(binary_metadata))
-                                                            },
-                                                            _ => Err("couldnt parse cbor")
-                                                        }
-
+                                                        model::Value::Cbor(metadata_final.encode_fragment().unwrap())
                                                     },
 
                                                 }
 
                                             };
 
-                                            if let Ok(meta_payload) = main_meta_payload {
-                                                let main_meta_command = {
-                                                    match should_keep_historical_metadata {
-                                                        true => {
-                                                            model::CRDTCommand::LastWriteWins(
-                                                                format!("{}.{}", prefix, fingerprint_str),
-                                                                meta_payload,
-                                                                timestamp
-                                                            )
-                                                        }
+                                            let main_meta_command = {
+                                                match should_keep_historical_metadata {
+                                                    true => {
+                                                        model::CRDTCommand::LastWriteWins(
+                                                            format!("{}.{}", prefix, fingerprint_str),
+                                                            meta_payload,
+                                                            timestamp
+                                                        )
 
-                                                        false => {
-                                                            model::CRDTCommand::AnyWriteWins(
-                                                                format!("{}.{}", prefix, fingerprint_str),
-                                                                meta_payload,
-                                                            )
-                                                        }
                                                     }
-                                                };
 
-                                                output.send(gasket::messaging::Message::from(main_meta_command))?;
-                                            }
+                                                    false => {
+                                                        model::CRDTCommand::AnyWriteWins(
+                                                            format!("{}.{}", prefix, fingerprint_str),
+                                                            meta_payload,
+                                                        )
+
+                                                    }
+
+                                                }
+
+                                            };
+
+                                            output.send(gasket::messaging::Message::from(main_meta_command))?;
 
                                             if should_keep_asset_index {
                                                 output.send(model::CRDTCommand::SetAdd(
