@@ -15,9 +15,12 @@ use pallas::ledger::primitives::Fragment;
 
 use serde::Deserialize;
 use serde_json;
-use serde_json::json;
 
 use crate::{crosscut, model};
+
+use serde_cbor::from_slice;
+use serde_json::{to_string, Value};
+
 
 #[derive(Deserialize, Copy, Clone)]
 pub enum Projection {
@@ -177,14 +180,16 @@ impl Reducer {
 
                                             let meta_payload = {
                                                 let metadata_final = self.get_wrapped_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_metadata);
+                                                let cbor = metadata_final.encode_fragment().unwrap();
 
                                                 match should_export_json {
                                                     true => {
-                                                        model::Value::String(serde_json::to_string(&metadata_final).unwrap())
+                                                        let decoded_value = serde_cbor::from_slice(&cbor).expect("oops");
+                                                        model::Value::String(decoded_value)
                                                     },
 
                                                     false => {
-                                                        model::Value::Cbor(metadata_final.encode_fragment().unwrap())
+                                                        model::Value::Cbor(cbor)
                                                     },
 
                                                 }
