@@ -183,7 +183,7 @@ impl Reducer {
                                                     serde_json::Number::from(timestamp)
                                                 ));
 
-                                                if let Ok(json_string) = serde_json::to_string_pretty(&std_wrap_map) {
+                                                if let Ok(json_string) = serde_json::to_string_pretty(&std_wrap_map.clone()) {
                                                     if should_keep_historical_metadata {
                                                         output.send(model::CRDTCommand::AnyWriteWins(
                                                             format!("{}.{}", prefix, fingerprint_str),
