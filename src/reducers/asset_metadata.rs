@@ -94,7 +94,7 @@ impl Reducer {
 
     }
 
-    fn get_wrapped_metadata_fragment(&self, asset_name: String, policy_id: String, asset_metadata: &KeyValuePairs<Metadatum, Metadatum>) -> ShelleyMaAuxiliaryData {
+    fn get_wrapped_metadata_fragment(&self, asset_name: String, policy_id: String, asset_metadata: &KeyValuePairs<Metadatum, Metadatum>) -> Metadata {
         let asset_map = KeyValuePairs::from(
             vec![(Metadatum::Text(asset_name), Metadatum::Map(asset_metadata.clone())); 1]
         );
@@ -108,10 +108,7 @@ impl Reducer {
             Metadatum::Map(policy_map.clone())
         )];
 
-        ShelleyMaAuxiliaryData {
-            transaction_metadata: Metadata::from(meta_wrapper_721),
-            auxiliary_scripts: None,
-        }
+        Metadata::from(meta_wrapper_721)
     }
 
     fn send(
