@@ -181,7 +181,7 @@ impl Reducer {
                                                 match should_export_json {
                                                     true => {
                                                         let d = json!(metadata_final);
-                                                        model::Value::Json(d)
+                                                        model::Value::String(d.to_string())
                                                     },
 
                                                     false => {
