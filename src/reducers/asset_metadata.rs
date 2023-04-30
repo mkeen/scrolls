@@ -260,7 +260,6 @@ impl Reducer {
     pub fn reduce_block<'b>(
         &mut self,
         block: &'b MultiEraBlock<'b>,
-        ctx: &model::BlockContext,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         for tx in &block.txs() {

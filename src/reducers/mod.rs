@@ -251,7 +251,7 @@ impl Reducer {
             #[cfg(feature = "unstable")]
             Reducer::AddressesByStake(x) => x.reduce_block(block, ctx, output),
             #[cfg(feature = "unstable")]
-            Reducer::MintAssetMetadata(x) => x.reduce_block(block, ctx, output),
+            Reducer::MintAssetMetadata(x) => x.reduce_block(block, output),
             #[cfg(feature = "unstable")]
             Reducer::StakeMultiAsset(x) => x.reduce_block(block, ctx, output)
         }
