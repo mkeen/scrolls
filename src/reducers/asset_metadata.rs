@@ -161,9 +161,9 @@ impl Reducer {
         if let Some(safe_mint) = tx.mint().as_alonzo() {
             for (policy_id, assets) in safe_mint.iter() {
                 let policy_id_str = hex::encode(policy_id);
-                let zero: &i64;
+                let zero: i64 = 0;
 
-                for (asset_name, _) in assets.iter().filter(|&(_, quantity)| quantity > zero) {
+                for (asset_name, _) in assets.iter().filter(|&(_, quantity)| quantity > &zero) {
                     if let Ok(asset_name_str) = String::from_utf8(asset_name.to_vec()) {
                         if let Some(policy_map) = tx.metadata().find(MetadatumLabel::from(CIP25_META)) {
                             if let Some(policy_assets) = self.find_metadata_policy_assets(&policy_map, &policy_id_str) {
