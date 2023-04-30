@@ -1,12 +1,14 @@
+use std::collections::HashMap;
 use std::ops::Deref;
 
 use bech32::{self, ToBase32, Variant};
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
 use hex::{self};
+use log::MetadataBuilder;
 
-use pallas::ledger::primitives::alonzo::{Metadatum, MetadatumLabel};
-use pallas::ledger::traverse::{MultiEraBlock, MultiEraTx};
+use pallas::ledger::primitives::alonzo::{Metadata, Metadatum, MetadatumLabel};
+use pallas::ledger::traverse::{MultiEraBlock, MultiEraMeta, MultiEraTx};
 use pallas::codec::utils::{KeyValuePairs};
 use pallas::ledger::primitives::Fragment;
 
@@ -31,7 +33,6 @@ impl Default for Projection {
 pub struct Config {
     pub key_prefix: Option<String>,
     pub export_json: Option<bool>,
-    pub store_timestamps: Option<bool>,
     pub historical_metadata: Option<bool>,
     pub policy_asset_index: Option<bool>,
     pub filter: Option<crosscut::filters::Predicate>,
@@ -47,8 +48,7 @@ pub struct Reducer {
 const CIP25_META: u64 = 721;
 
 impl Reducer {
-    fn find_metadata_policy_assets(&self, metadata: &Metadatum, target_policy_id: &str,
-    ) -> Option<KeyValuePairs<Metadatum, Metadatum>> {
+    fn find_metadata_policy_assets(&self, metadata: &Metadatum, target_policy_id: &str) -> Option<KeyValuePairs<Metadatum, Metadatum>> {
         if let Metadatum::Map(kv) = metadata {
             for (policy_label, policy_contents) in kv.iter() {
                 if let Metadatum::Text(policy_label) = policy_label {
@@ -134,7 +134,6 @@ impl Reducer {
         let prefix = self.config.key_prefix.as_deref().unwrap_or("asset-metadata");
         let should_export_json = self.config.export_json.unwrap_or(false);
         let should_keep_asset_index = self.config.policy_asset_index.unwrap_or(false);
-        let should_track_asset_mint_timestamps = self.config.store_timestamps.unwrap_or(false);
         let should_keep_historical_metadata = self.config.historical_metadata.unwrap_or(false);
 
         if let Some(safe_mint) = tx.mint().as_alonzo() {
@@ -154,88 +153,80 @@ impl Reducer {
 
                                 if let Some((_, asset_contents)) = filtered_policy_assets {
                                     if let Metadatum::Map(asset_metadata) = asset_contents {
-                                        if let Ok(fingerprint_str) = self.asset_fingerprint([&policy_id_str, hex::encode(&asset_name_str).as_str()]) {
+                                        if let Ok(fingerprint_str) = self.asset_fingerprint([&policy_id_str.clone(), hex::encode(&asset_name_str).as_str()]) {
                                             let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
 
-                                            if should_track_asset_mint_timestamps {
-                                                output.send(gasket::messaging::Message::from(
-                                                    model::CRDTCommand::SetAdd(
-                                                        format!("{}.mint-times.{}", prefix, fingerprint_str),
-                                                        timestamp.to_string()
-                                                    )
+                                            let main_meta_payload = {
+                                                match should_export_json {
+                                                    true => {
+                                                        let asset_map = KeyValuePairs::from(
+                                                            vec![(asset_name_str, asset_metadata); 1]
+                                                        );
 
-                                                ))?;
+                                                        let policy_map = KeyValuePairs::from(
+                                                            vec![(policy_id_str.clone(), asset_map)]
+                                                        );
+
+                                                        let meta_wrapper_721 = KeyValuePairs::from(vec![(
+                                                            CIP25_META,
+                                                            policy_map
+                                                        )]);
+
+                                                        match serde_json::to_string_pretty(&meta_wrapper_721) {
+                                                            Ok(json_string) => {
+                                                                Ok(model::Value::String(json_string))
+                                                            },
+                                                            Err(_) => Err("couldnt parse json"),
+                                                        }
+
+                                                    },
+
+                                                    false => {
+                                                        match asset_metadata.encode_fragment() {
+                                                            Ok(binary_metadata) => {
+                                                                Ok(model::Value::Cbor(binary_metadata))
+                                                            },
+                                                            _ => Err("couldnt parse cbor")
+                                                        }
+
+                                                    },
+
+                                                }
+
+                                            };
+
+                                            if let Ok(meta_payload) = main_meta_payload {
+                                                let main_meta_command = {
+                                                    match should_keep_historical_metadata {
+                                                        true => {
+                                                            model::CRDTCommand::LastWriteWins(
+                                                                format!("{}.{}", prefix, fingerprint_str),
+                                                                meta_payload,
+                                                                timestamp
+                                                            )
+                                                        }
+
+                                                        false => {
+                                                            model::CRDTCommand::AnyWriteWins(
+                                                                format!("{}.{}", prefix, fingerprint_str),
+                                                                meta_payload,
+                                                            )
+                                                        }
+                                                    }
+                                                };
+
+                                                output.send(gasket::messaging::Message::from(main_meta_command))?;
+                                            }
+
+                                            if should_keep_asset_index {
+                                                output.send(model::CRDTCommand::SetAdd(
+                                                    format!("{}.{}", prefix, policy_id_str),
+                                                    fingerprint_str,
+                                                ).into())?;
 
                                             }
 
-                                            if should_export_json {
-                                                let mut metadata = serde_json::Map::new();
-                                                let mut std_wrap_map = serde_json::Map::new();
-                                                let mut policy_wrap_map = serde_json::Map::new();
-                                                let mut asset_wrap_map = serde_json::Map::new();
-
-                                                let asset_map = kv_pairs_to_hashmap(&asset_metadata);
-                                                asset_wrap_map.insert(asset_name_str.clone(), serde_json::Value::Object(asset_map));
-                                                policy_wrap_map.insert(policy_id_str.clone(), serde_json::Value::Object(asset_wrap_map));
-                                                std_wrap_map.insert(CIP25_META.to_string(), serde_json::Value::Object(policy_wrap_map));
-                                                metadata.insert("metadata".to_string(), serde_json::Value::Object(std_wrap_map.clone()));
-                                                metadata.insert("last_minted".to_string(), serde_json::Value::Number(
-                                                    serde_json::Number::from(timestamp)
-                                                ));
-
-                                                if let Ok(json_string) = serde_json::to_string_pretty(&std_wrap_map) {
-                                                    if should_keep_historical_metadata {
-                                                        output.send(model::CRDTCommand::AnyWriteWins(
-                                                            format!("{}.{}", prefix, fingerprint_str),
-                                                            model::Value::String(json_string.to_owned()),
-                                                        ).into())?;
-
-                                                    } else {
-                                                        output.send(model::CRDTCommand::LastWriteWins(
-                                                            format!("{}.{}", prefix, fingerprint_str),
-                                                            model::Value::String(json_string.to_owned()),
-                                                            timestamp
-                                                        ).into())?;
-
-                                                    }
-
-                                                    if should_keep_asset_index {
-                                                        let asset_index_crdt = model::CRDTCommand::SetAdd(
-                                                            format!("{}.{}", prefix, policy_id_str),
-                                                            fingerprint_str);
-
-                                                        output.send(gasket::messaging::Message::from(asset_index_crdt))?;
-                                                    }
-
-                                                }
-
-                                            } else if let Ok(binary_metadata) = asset_contents.encode_fragment() {
-                                                if should_keep_historical_metadata {
-                                                    output.send(model::CRDTCommand::AnyWriteWins(
-                                                        format!("{}.{}", prefix, fingerprint_str),
-                                                        model::Value::Cbor(binary_metadata),
-                                                    ).into())?;
-
-                                                } else {
-                                                    output.send(model::CRDTCommand::LastWriteWins(
-                                                        format!("{}.{}", prefix, fingerprint_str),
-                                                        model::Value::Cbor(binary_metadata),
-                                                        timestamp
-                                                    ).into())?;
-
-                                                }
-
-                                                if should_keep_asset_index {
-                                                    let asset_index_crdt = model::CRDTCommand::SetAdd(
-                                                        format!("{}.{}", prefix, policy_id_str),
-                                                        fingerprint_str);
-
-                                                    output.send(gasket::messaging::Message::from(asset_index_crdt))?;
-                                                }
-
-                                            }
-
-                                        }
+                                        };
 
                                     }
 
@@ -252,6 +243,7 @@ impl Reducer {
             }
 
         }
+
 
         Ok(())
     }
