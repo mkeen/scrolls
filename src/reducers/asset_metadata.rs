@@ -109,13 +109,51 @@ impl Reducer {
         Metadata::from(meta_wrapper_721)
     }
 
-    fn get_metadata_fragment(&self, asset_name: String, policy_id: String, asset_metadata: Metadatum) -> Result<String, serde_json::Error> {
-        let asset_vec: Vec<(String, Metadatum)> = vec![(asset_name, asset_metadata); 1];
-        let policy_map = vec![(policy_id.clone(), asset_vec); 1];
-        let meta_wrapper_721 = vec![(CIP25_META, policy_map); 1];
+    fn get_metadata_fragment(&self, asset_name: String, policy_id: String, asset_metadata: &KeyValuePairs<Metadatum, Metadatum>) -> Result<String, serde_json::Error> {
+        let mut std_wrap_map = serde_json::Map::new();
+        let mut policy_wrap_map = serde_json::Map::new();
+        let mut asset_wrap_map = serde_json::Map::new();
+        let asset_map = self.kv_pairs_to_hashmap(asset_metadata);
 
-        let json_obj: Value = json!(meta_wrapper_721);
+        asset_wrap_map.insert(asset_name, serde_json::Value::Object(asset_map));
+        policy_wrap_map.insert(policy_id, serde_json::Value::Object(asset_wrap_map));
+        std_wrap_map.insert(CIP25_META.to_string(), serde_json::Value::Object(policy_wrap_map));
+
+        let json_obj: Value = json!(std_wrap_map);
         serde_json::to_string(&json_obj)
+    }
+
+    fn kv_pairs_to_hashmap(&self, kv_pairs: &KeyValuePairs<Metadatum, Metadatum>
+    ) -> serde_json::Map<String, serde_json::Value> {
+        fn metadatum_to_value(m: &Metadatum) -> serde_json::Value {
+            match m {
+                Metadatum::Int(int_value) => {
+                    serde_json::Value::String(int_value.to_string())
+                },
+                Metadatum::Bytes(bytes) => serde_json::Value::String(hex::encode(bytes.as_slice())),
+                Metadatum::Text(text) => serde_json::Value::String(text.clone()),
+                Metadatum::Array(array) => {
+                    let json_array: Vec<serde_json::Value> = array.iter().map(metadatum_to_value).collect();
+                    serde_json::Value::Array(json_array)
+                },
+                Metadatum::Map(kv_pairs) => {
+                    let json_object = self.kv_pairs_to_hashmap(kv_pairs);
+                    serde_json::Value::Object(json_object)
+                },
+
+            }
+
+        }
+
+        let mut hashmap = serde_json::Map::new();
+        for (key, value) in kv_pairs.deref() {
+            if let Metadatum::Text(key_str) = key {
+                hashmap.insert(key_str.clone(), metadatum_to_value(value));
+            }
+
+        }
+
+        hashmap
     }
 
     fn send(
@@ -124,39 +162,6 @@ impl Reducer {
         tx: &MultiEraTx,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        fn kv_pairs_to_hashmap(kv_pairs: &KeyValuePairs<Metadatum, Metadatum>
-        ) -> serde_json::Map<String, serde_json::Value> {
-            fn metadatum_to_value(m: &Metadatum) -> serde_json::Value {
-                match m {
-                    Metadatum::Int(int_value) => {
-                        serde_json::Value::String(int_value.to_string())
-                    },
-                    Metadatum::Bytes(bytes) => serde_json::Value::String(hex::encode(bytes.as_slice())),
-                    Metadatum::Text(text) => serde_json::Value::String(text.clone()),
-                    Metadatum::Array(array) => {
-                        let json_array: Vec<serde_json::Value> = array.iter().map(metadatum_to_value).collect();
-                        serde_json::Value::Array(json_array)
-                    },
-                    Metadatum::Map(kv_pairs) => {
-                        let json_object = kv_pairs_to_hashmap(kv_pairs);
-                        serde_json::Value::Object(json_object)
-                    },
-
-                }
-
-            }
-
-            let mut hashmap = serde_json::Map::new();
-            for (key, value) in kv_pairs.deref() {
-                if let Metadatum::Text(key_str) = key {
-                    hashmap.insert(key_str.clone(), metadatum_to_value(value));
-                }
-
-            }
-
-            hashmap
-        }
-
         let prefix = self.config.key_prefix.as_deref().unwrap_or("asset-metadata");
         let should_export_json = self.config.export_json.unwrap_or(false);
         let should_keep_asset_index = self.config.policy_asset_index.unwrap_or(false);
@@ -187,7 +192,7 @@ impl Reducer {
 
                                                 match should_export_json {
                                                     true => {
-                                                        let metadata_final_json = self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_contents.clone());
+                                                        let metadata_final_json = self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_metadata);
                                                         match metadata_final_json {
                                                             Ok(final_meta) => Ok(final_meta),
                                                             _ => Err("Couldn't parse json")
