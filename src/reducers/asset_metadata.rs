@@ -147,9 +147,9 @@ impl Reducer {
         let mut asset_wrap_map = serde_json::Map::new();
         let asset_map = kv_pairs_to_hashmap(asset_metadata);
 
-        asset_wrap_map.insert(asset_name, serde_json::Value::Object(asset_map));
-        policy_wrap_map.insert(policy_id, serde_json::Value::Object(asset_wrap_map));
-        std_wrap_map.insert(CIP25_META.to_string(), serde_json::Value::Object(policy_wrap_map));
+        asset_wrap_map.insert(asset_name, Value::Object(asset_map));
+        policy_wrap_map.insert(policy_id, Value::Object(asset_wrap_map));
+        std_wrap_map.insert(CIP25_META.to_string(), Value::Object(policy_wrap_map));
 
         serde_json::to_string_pretty(&std_wrap_map)
     }
@@ -165,95 +165,92 @@ impl Reducer {
         let should_keep_asset_index = self.config.policy_asset_index.unwrap_or(false);
         let should_keep_historical_metadata = self.config.historical_metadata.unwrap_or(false);
 
-        if let Some(safe_mint) = tx.mint().as_alonzo() {
-            for (policy_id, assets) in safe_mint.iter() {
-                let policy_id_str = hex::encode(policy_id);
-                let zero: i64 = 0;
+        for (policy_id, assets) in tx.mint().iter() {
+            let policy_id_str = hex::encode(policy_id);
+            let zero: i64 = 0;
 
-                for (asset_name, _) in assets.iter().filter(|&(_, quantity)| quantity > &zero) {
-                    if let Ok(asset_name_str) = String::from_utf8(asset_name.to_vec()) {
-                        if let Some(policy_map) = tx.metadata().find(MetadatumLabel::from(CIP25_META)) {
-                            if let Some(policy_assets) = self.find_metadata_policy_assets(&policy_map, &policy_id_str) {
-                                // Identify the metadata items that are relevant to the current minted asset
-                                let filtered_policy_assets = policy_assets.iter().find(|(l, _)| {
-                                    let asset_label = self.get_asset_label(l.clone().to_owned());
-                                    asset_label.as_str() == &asset_name_str
-                                });
+            for (asset_name, _) in assets.iter().filter(|&(_, quantity)| quantity > &zero) {
+                if let Ok(asset_name_str) = String::from_utf8(asset_name.to_vec()) {
+                    if let Some(policy_map) = tx.metadata().find(MetadatumLabel::from(CIP25_META)) {
+                        if let Some(policy_assets) = self.find_metadata_policy_assets(&policy_map, &policy_id_str) {
+                            // Identify the metadata items that are relevant to the current minted asset
+                            let filtered_policy_assets = policy_assets.iter().find(|(l, _)| {
+                                let asset_label = self.get_asset_label(l.clone().to_owned());
+                                asset_label.as_str() == &asset_name_str
+                            });
 
-                                if let Some((_, asset_contents)) = filtered_policy_assets {
-                                    if let Metadatum::Map(asset_metadata) = asset_contents {
-                                        if let Ok(fingerprint_str) = self.asset_fingerprint([&policy_id_str.clone(), hex::encode(&asset_name_str).as_str()]) {
-                                            let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
+                            if let Some((_, asset_contents)) = filtered_policy_assets {
+                                if let Metadatum::Map(asset_metadata) = asset_contents {
+                                    if let Ok(fingerprint_str) = self.asset_fingerprint([&policy_id_str.clone(), hex::encode(&asset_name_str).as_str()]) {
+                                        let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
 
-                                            let meta_payload = {
-                                                let metadata_final = self.get_wrapped_metadata_fragment(asset_name_str.clone(), policy_id_str.clone(), asset_metadata);
+                                        let meta_payload = {
+                                            let metadata_final = self.get_wrapped_metadata_fragment(asset_name_str.clone(), policy_id_str.clone(), asset_metadata);
 
-                                                match should_export_json {
-                                                    true => {
-                                                        let metadata_final_json = self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_metadata);
-                                                        match metadata_final_json {
-                                                            Ok(final_meta) => Ok(final_meta),
-                                                            _ => Err("Couldn't parse json")
-                                                        }
-
-                                                    },
-
-                                                    false => {
-                                                        match metadata_final.encode_fragment() {
-                                                            Ok(final_meta) => {
-                                                                match String::from_utf8(final_meta) {
-                                                                    Ok(converted_meta) => Ok(converted_meta),
-                                                                    _ => Err("")
-                                                                }
-                                                            },
-                                                            _ => Err("")
-                                                        }
-
-                                                    },
-
-                                                }
-
-                                            };
-
-                                            if let Ok(verified_meta_payload) = meta_payload {
-                                                let main_meta_command = {
-                                                    match should_keep_historical_metadata {
-                                                        true => {
-                                                            model::CRDTCommand::LastWriteWins(
-                                                                format!("{}.{}", prefix, fingerprint_str),
-                                                                model::Value::String(verified_meta_payload),
-                                                                timestamp
-                                                            )
-
-                                                        }
-
-                                                        false => {
-                                                            model::CRDTCommand::AnyWriteWins(
-                                                                format!("{}.{}", prefix, fingerprint_str),
-                                                                model::Value::String(verified_meta_payload),
-                                                            )
-
-                                                        }
-
+                                            match should_export_json {
+                                                true => {
+                                                    let metadata_final_json = self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_metadata);
+                                                    match metadata_final_json {
+                                                        Ok(final_meta) => Ok(final_meta),
+                                                        _ => Err("Couldn't parse json")
                                                     }
 
-                                                };
+                                                },
 
-                                                output.send(gasket::messaging::Message::from(main_meta_command))?;
+                                                false => {
+                                                    match metadata_final.encode_fragment() {
+                                                        Ok(final_meta) => {
+                                                            match String::from_utf8(final_meta) {
+                                                                Ok(converted_meta) => Ok(converted_meta),
+                                                                _ => Err("")
+                                                            }
+                                                        },
+                                                        _ => Err("")
+                                                    }
 
-                                                if should_keep_asset_index {
-                                                    output.send(model::CRDTCommand::SetAdd(
-                                                        format!("{}.{}", prefix, policy_id_str),
-                                                        fingerprint_str,
-                                                    ).into())?;
-
-                                                }
+                                                },
 
                                             }
 
                                         };
 
-                                    }
+                                        if let Ok(verified_meta_payload) = meta_payload {
+                                            let main_meta_command = {
+                                                match should_keep_historical_metadata {
+                                                    true => {
+                                                        model::CRDTCommand::LastWriteWins(
+                                                            format!("{}.{}", prefix, fingerprint_str),
+                                                            model::Value::String(verified_meta_payload),
+                                                            timestamp
+                                                        )
+
+                                                    }
+
+                                                    false => {
+                                                        model::CRDTCommand::AnyWriteWins(
+                                                            format!("{}.{}", prefix, fingerprint_str),
+                                                            model::Value::String(verified_meta_payload),
+                                                        )
+
+                                                    }
+
+                                                }
+
+                                            };
+
+                                            output.send(gasket::messaging::Message::from(main_meta_command))?;
+
+                                            if should_keep_asset_index {
+                                                output.send(model::CRDTCommand::SetAdd(
+                                                    format!("{}.{}", prefix, policy_id_str),
+                                                    fingerprint_str,
+                                                ).into())?;
+
+                                            }
+
+                                        }
+
+                                    };
 
                                 }
 
@@ -268,7 +265,6 @@ impl Reducer {
             }
 
         }
-
 
         Ok(())
     }
