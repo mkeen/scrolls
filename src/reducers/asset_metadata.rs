@@ -151,7 +151,7 @@ impl Reducer {
         policy_wrap_map.insert(policy_id, Value::Object(asset_wrap_map));
         std_wrap_map.insert(CIP25_META.to_string(), Value::Object(policy_wrap_map));
 
-        serde_json::to_string_pretty(&std_wrap_map).unwrap()
+        serde_json::to_string(&std_wrap_map).unwrap()
     }
 
     fn send(
