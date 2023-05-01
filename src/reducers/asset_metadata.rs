@@ -47,6 +47,39 @@ pub struct Reducer {
 
 const CIP25_META: u64 = 721;
 
+fn kv_pairs_to_hashmap(kv_pairs: &KeyValuePairs<Metadatum, Metadatum>
+) -> serde_json::Map<String, serde_json::Value> {
+    fn metadatum_to_value(m: &Metadatum) -> serde_json::Value {
+        match m {
+            Metadatum::Int(int_value) => {
+                serde_json::Value::String(int_value.to_string())
+            },
+            Metadatum::Bytes(bytes) => serde_json::Value::String(hex::encode(bytes.as_slice())),
+            Metadatum::Text(text) => serde_json::Value::String(text.clone()),
+            Metadatum::Array(array) => {
+                let json_array: Vec<serde_json::Value> = array.iter().map(metadatum_to_value).collect();
+                serde_json::Value::Array(json_array)
+            },
+            Metadatum::Map(kv_pairs) => {
+                let json_object = kv_pairs_to_hashmap(kv_pairs);
+                serde_json::Value::Object(json_object)
+            },
+
+        }
+
+    }
+
+    let mut hashmap = serde_json::Map::new();
+    for (key, value) in kv_pairs.deref() {
+        if let Metadatum::Text(key_str) = key {
+            hashmap.insert(key_str.clone(), metadatum_to_value(value));
+        }
+
+    }
+
+    hashmap
+}
+
 impl Reducer {
     fn find_metadata_policy_assets(&self, metadata: &Metadatum, target_policy_id: &str) -> Option<KeyValuePairs<Metadatum, Metadatum>> {
         if let Metadatum::Map(kv) = metadata {
@@ -113,7 +146,7 @@ impl Reducer {
         let mut std_wrap_map = serde_json::Map::new();
         let mut policy_wrap_map = serde_json::Map::new();
         let mut asset_wrap_map = serde_json::Map::new();
-        let asset_map = self.kv_pairs_to_hashmap(asset_metadata);
+        let asset_map = kv_pairs_to_hashmap(asset_metadata);
 
         asset_wrap_map.insert(asset_name, serde_json::Value::Object(asset_map));
         policy_wrap_map.insert(policy_id, serde_json::Value::Object(asset_wrap_map));
@@ -121,39 +154,6 @@ impl Reducer {
 
         let json_obj: Value = json!(std_wrap_map);
         serde_json::to_string(&json_obj)
-    }
-
-    fn kv_pairs_to_hashmap(&self, kv_pairs: &KeyValuePairs<Metadatum, Metadatum>
-    ) -> serde_json::Map<String, serde_json::Value> {
-        fn metadatum_to_value(m: &Metadatum) -> serde_json::Value {
-            match m {
-                Metadatum::Int(int_value) => {
-                    serde_json::Value::String(int_value.to_string())
-                },
-                Metadatum::Bytes(bytes) => serde_json::Value::String(hex::encode(bytes.as_slice())),
-                Metadatum::Text(text) => serde_json::Value::String(text.clone()),
-                Metadatum::Array(array) => {
-                    let json_array: Vec<serde_json::Value> = array.iter().map(metadatum_to_value).collect();
-                    serde_json::Value::Array(json_array)
-                },
-                Metadatum::Map(kv_pairs) => {
-                    let json_object = self.kv_pairs_to_hashmap(kv_pairs);
-                    serde_json::Value::Object(json_object)
-                },
-
-            }
-
-        }
-
-        let mut hashmap = serde_json::Map::new();
-        for (key, value) in kv_pairs.deref() {
-            if let Metadatum::Text(key_str) = key {
-                hashmap.insert(key_str.clone(), metadatum_to_value(value));
-            }
-
-        }
-
-        hashmap
     }
 
     fn send(
