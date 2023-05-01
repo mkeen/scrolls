@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::ops::Deref;
 
@@ -5,22 +6,17 @@ use bech32::{self, ToBase32, Variant};
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
 use hex::{self};
-use log::MetadataBuilder;
-use pallas::codec::minicbor::Encoder;
 
-use pallas::ledger::primitives::alonzo::{AuxiliaryData, Metadata, Metadatum, MetadatumLabel, ShelleyMaAuxiliaryData};
-use pallas::ledger::traverse::{MultiEraBlock, MultiEraMeta, MultiEraTx};
+use pallas::ledger::primitives::alonzo::{Metadata, Metadatum, MetadatumLabel, ShelleyMaAuxiliaryData};
+use pallas::ledger::traverse::{MultiEraBlock, MultiEraTx};
 use pallas::codec::utils::{KeyValuePairs};
 use pallas::ledger::primitives::Fragment;
 
 use serde::Deserialize;
 use serde_json;
+use serde_json::{json, Map, Value};
 
 use crate::{crosscut, model};
-
-use serde_cbor::from_slice;
-use serde_json::{to_string, Value};
-
 
 #[derive(Deserialize, Copy, Clone)]
 pub enum Projection {
@@ -114,6 +110,15 @@ impl Reducer {
         Metadata::from(meta_wrapper_721)
     }
 
+    fn get_metadata_fragment(&self, asset_name: String, policy_id: String, asset_metadata: Metadatum) -> String {
+        let asset_vec: Vec<(String, Metadatum)> = vec![(asset_name, asset_metadata); 1];
+        let policy_map = vec![(policy_id.clone(), asset_vec); 1];
+        let meta_wrapper_721 = vec![(CIP25_META, policy_map); 1];
+
+        let json_obj: Value = json!(meta_wrapper_721);
+        serde_json::to_string(&json_obj).unwrap()
+    }
+
     fn send(
         &mut self,
         block: &MultiEraBlock,
@@ -179,13 +184,13 @@ impl Reducer {
                                             let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
 
                                             let meta_payload = {
-                                                let metadata_final = self.get_wrapped_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_metadata);
+                                                let metadata_final = self.get_wrapped_metadata_fragment(asset_name_str.clone(), policy_id_str.clone(), asset_metadata);
                                                 let cbor = metadata_final.encode_fragment().unwrap();
 
                                                 match should_export_json {
                                                     true => {
-                                                        let decoded_value = serde_cbor::from_slice(&cbor).expect("oops");
-                                                        model::Value::String(decoded_value)
+                                                        let metadata_final_json = self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_contents);
+                                                        model::Value::String(metadata_final_json)
                                                     },
 
                                                     false => {
