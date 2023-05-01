@@ -1,5 +1,3 @@
-use std::any::Any;
-use std::collections::HashMap;
 use std::ops::Deref;
 
 use bech32::{self, ToBase32, Variant};
@@ -7,14 +5,14 @@ use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
 use hex::{self};
 
-use pallas::ledger::primitives::alonzo::{Metadata, Metadatum, MetadatumLabel, ShelleyMaAuxiliaryData};
+use pallas::ledger::primitives::alonzo::{Metadata, Metadatum, MetadatumLabel};
 use pallas::ledger::traverse::{MultiEraBlock, MultiEraTx};
 use pallas::codec::utils::{KeyValuePairs};
 use pallas::ledger::primitives::Fragment;
 
 use serde::Deserialize;
 use serde_json;
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 
 use crate::{crosscut, model};
 
@@ -110,13 +108,13 @@ impl Reducer {
         Metadata::from(meta_wrapper_721)
     }
 
-    fn get_metadata_fragment(&self, asset_name: String, policy_id: String, asset_metadata: Metadatum) -> String {
+    fn get_metadata_fragment(&self, asset_name: String, policy_id: String, asset_metadata: Metadatum) -> Result<String, serde_json::Error> {
         let asset_vec: Vec<(String, Metadatum)> = vec![(asset_name, asset_metadata); 1];
         let policy_map = vec![(policy_id.clone(), asset_vec); 1];
         let meta_wrapper_721 = vec![(CIP25_META, policy_map); 1];
 
         let json_obj: Value = json!(meta_wrapper_721);
-        serde_json::to_string(&json_obj).unwrap()
+        serde_json::to_string(&json_obj)
     }
 
     fn send(
@@ -190,7 +188,7 @@ impl Reducer {
                                                 match should_export_json {
                                                     true => {
                                                         let metadata_final_json = self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_contents.clone());
-                                                        model::Value::String(metadata_final_json)
+                                                        model::Value::String(metadata_final_json.unwrap())
                                                     },
 
                                                     false => {
