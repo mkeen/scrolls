@@ -139,9 +139,9 @@ pub enum CRDTCommand {
     AnyWriteWins(Key, Value),
     // TODO make sure Value is a generic not stringly typed
     PNCounter(Key, Delta),
-    HashCounter(Member, Key, Delta),
-    HashSetValue(Member, Key, Value),
-    HashUnsetKey(Member, Key),
+    HashCounter(Key, Member, Delta),
+    HashSetValue(Key, Member, Value),
+    HashUnsetKey(Key, Member),
     BlockFinished(Point),
 }
 
@@ -240,12 +240,12 @@ impl CRDTCommand {
 
     pub fn hash_set_value<V>(
         prefix: Option<&str>,
-        member: String,
         key: &str,
+        member: String,
         value: V,
     ) -> CRDTCommand
-    where
-        V: Into<Value>,
+        where
+            V: Into<Value>,
     {
         let key = match prefix {
             Some(prefix) => format!("{}.{}", prefix, key.to_string()),
@@ -266,8 +266,8 @@ impl CRDTCommand {
 
     pub fn hash_counter(
         prefix: Option<&str>,
-        member: String,
         key: &str,
+        member: String,
         delta: i64,
     ) -> CRDTCommand {
         let key = match prefix {
