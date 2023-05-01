@@ -242,22 +242,22 @@ impl gasket::runtime::Worker for Worker {
                     .incr(key, value)
                     .or_restart()?;
             }
-            model::CRDTCommand::HashSetValue(name, key, value) => {
-                log::debug!("setting hash {} member {}", name, key);
+            model::CRDTCommand::HashSetValue(member, key, value) => {
+                log::debug!("setting hash {} member {}", member, key);
 
                 self.connection
                     .as_mut()
                     .unwrap()
-                    .hset(name, key, value)
+                    .hset(member, key, value)
                     .or_restart()?;
             }
-            model::CRDTCommand::HashCounter(name, key, delta) => {
-                log::debug!("increasing hash {} member {} by {}", name, key, delta);
+            model::CRDTCommand::HashCounter(member, key, delta) => {
+                log::debug!("increasing hash {} member {} by {}", member, key, delta);
 
                 self.connection
                     .as_mut()
                     .unwrap()
-                    .hincr(name, key, delta)
+                    .hincr(member, key, delta)
                     .or_restart()?;
             }
             model::CRDTCommand::HashUnsetKey(name, key) => {

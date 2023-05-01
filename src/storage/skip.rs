@@ -128,14 +128,14 @@ impl gasket::runtime::Worker for Worker {
             model::CRDTCommand::PNCounter(key, value) => {
                 log::debug!("increasing counter [{}], by [{}]", key, value);
             }
-            model::CRDTCommand::HashSetValue(name, key, _) => {
-                log::debug!("setting hash {} member {}", name, key);
+            model::CRDTCommand::HashSetValue(member, key, _) => {
+                log::debug!("setting hash member {} key {}", member, key);
             }
-            model::CRDTCommand::HashCounter(name, key, delta) => {
-                log::debug!("increasing hash {} member {} by {}", name, key, delta);
+            model::CRDTCommand::HashCounter(member, key, delta) => {
+                log::debug!("increasing hash member {} key {} by {}", member, key, delta);
             }
-            model::CRDTCommand::HashUnsetKey(name, key) => {
-                log::debug!("deleting hash {} member {}", name, key);
+            model::CRDTCommand::HashUnsetKey(member, key) => {
+                log::debug!("deleting hash member {} key {}", member, key);
             }
             model::CRDTCommand::BlockFinished(point) => {
                 log::debug!("block finished {:?}", point);
