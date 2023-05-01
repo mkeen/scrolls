@@ -12,7 +12,6 @@ use pallas::codec::utils::{KeyValuePairs};
 use pallas::ledger::primitives::Fragment;
 
 use serde::Deserialize;
-use serde_json;
 use serde_json::{json, Value};
 
 use crate::{crosscut, model};
@@ -48,21 +47,21 @@ pub struct Reducer {
 const CIP25_META: u64 = 721;
 
 fn kv_pairs_to_hashmap(kv_pairs: &KeyValuePairs<Metadatum, Metadatum>
-) -> serde_json::Map<String, serde_json::Value> {
-    fn metadatum_to_value(m: &Metadatum) -> serde_json::Value {
+) -> serde_json::Map<String, Value> {
+    fn metadatum_to_value(m: &Metadatum) -> Value {
         match m {
             Metadatum::Int(int_value) => {
-                serde_json::Value::String(int_value.to_string())
+                Value::String(int_value.to_string())
             },
-            Metadatum::Bytes(bytes) => serde_json::Value::String(hex::encode(bytes.as_slice())),
-            Metadatum::Text(text) => serde_json::Value::String(text.clone()),
+            Metadatum::Bytes(bytes) => Value::String(hex::encode(bytes.as_slice())),
+            Metadatum::Text(text) => Value::String(text.clone()),
             Metadatum::Array(array) => {
-                let json_array: Vec<serde_json::Value> = array.iter().map(metadatum_to_value).collect();
-                serde_json::Value::Array(json_array)
+                let json_array: Vec<Value> = array.iter().map(metadatum_to_value).collect();
+                Value::Array(json_array)
             },
             Metadatum::Map(kv_pairs) => {
                 let json_object = kv_pairs_to_hashmap(kv_pairs);
-                serde_json::Value::Object(json_object)
+                Value::Object(json_object)
             },
 
         }
@@ -152,8 +151,7 @@ impl Reducer {
         policy_wrap_map.insert(policy_id, serde_json::Value::Object(asset_wrap_map));
         std_wrap_map.insert(CIP25_META.to_string(), serde_json::Value::Object(policy_wrap_map));
 
-        let json_obj: Value = json!(std_wrap_map);
-        serde_json::to_string(&json_obj)
+        serde_json::to_string_pretty(&std_wrap_map)
     }
 
     fn send(
