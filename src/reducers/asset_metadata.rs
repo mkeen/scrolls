@@ -200,10 +200,10 @@ impl Reducer {
                                                             Ok(final_meta) => {
                                                                 match String::from_utf8(final_meta) {
                                                                     Ok(converted_meta) => Ok(converted_meta),
-                                                                    _ => Err("".to_string().as_str())
+                                                                    _ => Err("")
                                                                 }
                                                             },
-                                                            _ => Err("".to_string().as_str())
+                                                            _ => Err("")
                                                         }
 
                                                     },
