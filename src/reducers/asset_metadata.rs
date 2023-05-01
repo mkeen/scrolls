@@ -189,7 +189,7 @@ impl Reducer {
 
                                                 match should_export_json {
                                                     true => {
-                                                        let metadata_final_json = self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_contents);
+                                                        let metadata_final_json = self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_contents.clone());
                                                         model::Value::String(metadata_final_json)
                                                     },
 
