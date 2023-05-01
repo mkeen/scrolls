@@ -1,4 +1,5 @@
 use std::ops::Deref;
+use std::string::FromUtf8Error;
 
 use bech32::{self, ToBase32, Variant};
 use blake2::digest::{Update, VariableOutput};
@@ -183,52 +184,67 @@ impl Reducer {
 
                                             let meta_payload = {
                                                 let metadata_final = self.get_wrapped_metadata_fragment(asset_name_str.clone(), policy_id_str.clone(), asset_metadata);
-                                                let cbor = metadata_final.encode_fragment().unwrap();
 
                                                 match should_export_json {
                                                     true => {
                                                         let metadata_final_json = self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_contents.clone());
-                                                        model::Value::String(metadata_final_json.unwrap())
+                                                        match metadata_final_json {
+                                                            Ok(final_meta) => Ok(final_meta),
+                                                            _ => Err("Couldn't parse json")
+                                                        }
+
                                                     },
 
                                                     false => {
-                                                        model::Value::Cbor(cbor)
+                                                        match metadata_final.encode_fragment() {
+                                                            Ok(final_meta) => {
+                                                                match String::from_utf8(final_meta) {
+                                                                    Ok(converted_meta) => Ok(converted_meta),
+                                                                    _ => Err("".to_string().as_str())
+                                                                }
+                                                            },
+                                                            _ => Err("".to_string().as_str())
+                                                        }
+
                                                     },
 
                                                 }
 
                                             };
 
-                                            let main_meta_command = {
-                                                match should_keep_historical_metadata {
-                                                    true => {
-                                                        model::CRDTCommand::LastWriteWins(
-                                                            format!("{}.{}", prefix, fingerprint_str),
-                                                            meta_payload,
-                                                            timestamp
-                                                        )
+                                            if let Ok(verified_meta_payload) = meta_payload {
+                                                let main_meta_command = {
+                                                    match should_keep_historical_metadata {
+                                                        true => {
+                                                            model::CRDTCommand::LastWriteWins(
+                                                                format!("{}.{}", prefix, fingerprint_str),
+                                                                model::Value::String(verified_meta_payload),
+                                                                timestamp
+                                                            )
+
+                                                        }
+
+                                                        false => {
+                                                            model::CRDTCommand::AnyWriteWins(
+                                                                format!("{}.{}", prefix, fingerprint_str),
+                                                                model::Value::String(verified_meta_payload),
+                                                            )
+
+                                                        }
 
                                                     }
 
-                                                    false => {
-                                                        model::CRDTCommand::AnyWriteWins(
-                                                            format!("{}.{}", prefix, fingerprint_str),
-                                                            meta_payload,
-                                                        )
+                                                };
 
-                                                    }
+                                                output.send(gasket::messaging::Message::from(main_meta_command))?;
+
+                                                if should_keep_asset_index {
+                                                    output.send(model::CRDTCommand::SetAdd(
+                                                        format!("{}.{}", prefix, policy_id_str),
+                                                        fingerprint_str,
+                                                    ).into())?;
 
                                                 }
-
-                                            };
-
-                                            output.send(gasket::messaging::Message::from(main_meta_command))?;
-
-                                            if should_keep_asset_index {
-                                                output.send(model::CRDTCommand::SetAdd(
-                                                    format!("{}.{}", prefix, policy_id_str),
-                                                    fingerprint_str,
-                                                ).into())?;
 
                                             }
 
