@@ -260,13 +260,13 @@ impl gasket::runtime::Worker for Worker {
                     .hincr(member, key, delta)
                     .or_restart()?;
             }
-            model::CRDTCommand::HashUnsetKey(name, key) => {
-                log::debug!("deleting hash {} member {}", name, key);
+            model::CRDTCommand::HashUnsetKey(member, key) => {
+                log::debug!("deleting hash member {} key {}", member, key);
 
                 self.connection
                     .as_mut()
                     .unwrap()
-                    .hdel(name, key)
+                    .hdel(member, key)
                     .or_restart()?;
             }
             model::CRDTCommand::BlockFinished(point) => {
