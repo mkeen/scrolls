@@ -43,25 +43,37 @@ pub enum AddressIndex {
     Off,
 }
 
+#[derive(Deserialize, Clone)]
+pub struct KeyPrefix(String);
+
 impl Default for Projection {
     fn default() -> Self {
         Self::Cbor
     }
-
 }
 
 impl Default for StakeIndex {
     fn default() -> Self {
         Self::Off
     }
-
 }
 
 impl Default for AddressIndex {
     fn default() -> Self {
         Self::Off
     }
+}
 
+impl Into<String> for KeyPrefix {
+    fn into(self) -> String {
+        self.0
+    }
+}
+
+impl Default for KeyPrefix {
+    fn default() -> Self {
+        KeyPrefix(String::from("soa-wallet"))
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -103,7 +115,7 @@ pub enum AggrType {
 
 #[derive(Deserialize)]
 pub struct Config {
-    pub key_prefix: Option<String>,
+    pub key_prefix: Option<KeyPrefix>,
     pub filter: Option<crosscut::filters::Predicate>,
     pub stake_index: Option<StakeIndex>,
     pub address_index: Option<AddressIndex>,
@@ -138,6 +150,8 @@ impl Reducer {
         output: &mut super::OutputPort,
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
+        let prefix: String = self.config.key_prefix.clone().unwrap_or_default().into();
+
         let mut fingerprint_tallies: HashMap<String, i64> = HashMap::new();
         let mut policy_id_buckets: HashMap<String, String> = HashMap::new();
 
@@ -158,7 +172,7 @@ impl Reducer {
 
         for (fingerprint, quantity) in fingerprint_tallies {
             let total_asset_count = model::CRDTCommand::HashCounter(
-                format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
+                format!("{}.{}", prefix, stake_or_address),
                 fingerprint,
                 quantity
             );
@@ -178,6 +192,9 @@ impl Reducer {
         assets: &Vec<Asset>,
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
+        let prefix: String = self.config.key_prefix.clone().unwrap_or_default().into();
+        let projection = self.config.projection.unwrap_or_default();
+
         let mut fingerprint_tallies: HashMap<String, i64> = HashMap::new();
 
         for asset in assets {
@@ -196,7 +213,7 @@ impl Reducer {
 
         for (fingerprint, quantity) in fingerprint_tallies {
             let total_asset_count = model::CRDTCommand::HashCounter(
-                format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
+                format!("{}.{}", prefix, stake_or_address),
                 fingerprint,
                 -quantity
             );
