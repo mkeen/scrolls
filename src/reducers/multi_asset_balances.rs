@@ -124,31 +124,30 @@ impl Reducer {
                 Some(x) => x.to_bech32().unwrap_or(String::new()),
                 _ => address.to_bech32().unwrap_or(String::new()),
             },
+
             Address::Byron(_) => address.to_bech32().unwrap_or(String::new()),
             Address::Stake(_) => address.to_bech32().unwrap_or(String::new()),
         }
+
     }
 
     fn process_produced_txo(
         &self,
-        config: &Config,
         tx_output: &MultiEraOutput,
         timestamp: &u64,
         output: &mut super::OutputPort,
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
         let mut fingerprint_tallies: HashMap<String, i64> = HashMap::new();
+        let mut policy_id_buckets: HashMap<String, String> = HashMap::new();
 
         for asset in tx_output.assets() {
             if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
-                let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
-                if let Ok(asset_name) = asset_result {
-                    model::CRDTCommand::HashCounter(
-                        format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
-                    )
-
+                let asset_name = hex::encode(asset_name);
+                if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
                     if !fingerprint.is_empty() && !stake_or_address.is_empty() {
-                        *fingerprint_tallies.entry(fingerprint).or_insert(quantity as i64) += quantity as i64;
+                        *fingerprint_tallies.entry(fingerprint.clone()).or_insert(quantity as i64) += quantity as i64;
+                        policy_id_buckets.entry(fingerprint.to_string()).or_insert(policy_id.to_string());
                     }
 
                 }
@@ -158,8 +157,9 @@ impl Reducer {
         }
 
         for (fingerprint, quantity) in fingerprint_tallies {
-            let total_asset_count = model::CRDTCommand::PNCounter(
-                format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
+            let total_asset_count = model::CRDTCommand::HashCounter(
+                format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
+                fingerprint,
                 quantity
             );
 
@@ -172,42 +172,37 @@ impl Reducer {
 
     fn process_spent_txo(
         &mut self,
-        tx_input: &MultiEraOutput,
-        timestamp: &u64,
-        tx_hash: &str,
-        tx_index: i64,
         output: &mut super::OutputPort,
+        timestamp: &u64,
+
+        assets: &Vec<Asset>,
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
-        // for asset in tx_input.assets() {
-        //     if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
-        //         let asset_result = panic::catch_unwind(|| hex::encode(asset_name));
-        //         if let Ok(asset_name) = asset_result {
-        //             let (fingerprint, _) = MultiAssetSingleAgg::new(
-        //                 policy_id,
-        //                 asset_name.as_str(),
-        //                 quantity,
-        //                 tx_hash,
-        //                 tx_index,
-        //             ).unwrap();
-        //
-        //             if !fingerprint.is_empty() {
-        //                 let total_asset_count = model::CRDTCommand::PNCounter(
-        //                     format!("asset-qty.{}.{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address, fingerprint),
-        //                     -1 * quantity as i64
-        //                 );
-        //
-        //                 if let Ok(total_asset_count_message) = total_asset_count.try_into() {
-        //                     output.send(total_asset_count_message)?;
-        //                 }
-        //
-        //             }
-        //
-        //         }
-        //
-        //     };
-        //
-        // }
+        let mut fingerprint_tallies: HashMap<String, i64> = HashMap::new();
+
+        for asset in assets {
+            if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
+                let asset_name = hex::encode(asset_name);
+                if let Ok(fingerprint) = asset_fingerprint([policy_id.to_string().as_str(), asset_name.as_str()]) {
+                    if !fingerprint.is_empty() && !stake_or_address.is_empty() {
+                        *fingerprint_tallies.entry(fingerprint).or_insert(*quantity as i64) += *quantity as i64;
+                    }
+
+                }
+
+            };
+
+        }
+
+        for (fingerprint, quantity) in fingerprint_tallies {
+            let total_asset_count = model::CRDTCommand::HashCounter(
+                format!("{}.{}", self.config.key_prefix.as_deref().unwrap_or_default(), stake_or_address),
+                fingerprint,
+                -quantity
+            );
+
+            output.send(total_asset_count.into())?;
+        }
 
         Ok(())
     }
@@ -223,26 +218,32 @@ impl Reducer {
             for (_, meo) in tx.produces() {
                 if let Ok(address) = meo.address() {
                     self.process_produced_txo(
-                        &self.config,
                         &meo,
                         &timestamp,
                         output,
                         self.stake_or_address_from_address(&address),
                     )?;
+
                 }
 
             }
 
-            // for (_, mei) in ctx.find_consumed_txos(&tx, &self.policy).unwrap_or_default() {
-            //     if let Ok(address) = mei.address() {
-            //         let stake_or_address = self.stake_or_address_from_address(&address);
-            //         if stake_or_address.len() > 0 {
-            //             self.process_spent_txo(&mei, &timestamp, hex::encode(tx.hash()).as_str(), tx_index.try_into().unwrap(), output, stake_or_address);
-            //         }
-            //
-            //     }
-            //
-            // }
+            for (_, mei) in ctx.find_consumed_txos(&tx, &self.policy).unwrap_or_default() {
+                if let Ok(address) = mei.address() {
+                    let stake_or_address = self.stake_or_address_from_address(&address);
+                    if stake_or_address.len() > 0 {
+                        self.process_spent_txo(
+                            output,
+                            &timestamp,
+                            &mei.assets(),
+                            stake_or_address
+                        )?;
+
+                    }
+
+                }
+
+            }
 
         }
 

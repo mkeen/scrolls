@@ -271,7 +271,7 @@ impl gasket::runtime::Worker for Worker {
             }
             model::CRDTCommand::HashUnsetKey(key, member) => {
                 log::debug!("deleting hash key {} member {}", key, member);
-                
+
                 self.connection
                     .as_mut()
                     .unwrap()

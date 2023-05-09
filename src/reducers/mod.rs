@@ -43,6 +43,8 @@ pub mod utxos_by_asset;
 pub mod addresses_by_stake;
 #[cfg(feature = "unstable")]
 pub mod asset_metadata;
+#[cfg(feature = "unstable")]
+pub mod multi_asset_balances;
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
@@ -79,6 +81,8 @@ pub enum Config {
     AddressesByStake(addresses_by_stake::Config),
     #[cfg(feature = "unstable")]
     AssetMetadata(asset_metadata::Config),
+    #[cfg(feature = "unstable")]
+    MultiAssetBalances(multi_asset_balances::Config),
 }
 
 impl Config {
@@ -120,6 +124,8 @@ impl Config {
             Config::AddressesByStake(c) => c.plugin(policy),
             #[cfg(feature = "unstable")]
             Config::AssetMetadata(c) => c.plugin(chain, policy),
+            #[cfg(feature = "unstable")]
+            Config::MultiAssetBalances(c) => c.plugin(chain, policy),
         }
     }
 }
@@ -202,6 +208,8 @@ pub enum Reducer {
     AddressesByStake(addresses_by_stake::Reducer),
     #[cfg(feature = "unstable")]
     AssetMetadata(asset_metadata::Reducer),
+    #[cfg(feature = "unstable")]
+    MultiAssetBalances(multi_asset_balances::Reducer),
 }
 
 impl Reducer {
@@ -244,6 +252,8 @@ impl Reducer {
             Reducer::AddressesByStake(x) => x.reduce_block(block, ctx, output),
             #[cfg(feature = "unstable")]
             Reducer::AssetMetadata(x) => x.reduce_block(block, output),
+            #[cfg(feature = "unstable")]
+            Reducer::MultiAssetBalances(x) => x.reduce_block(block, ctx, output),
         }
     }
 }
