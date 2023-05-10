@@ -4,16 +4,12 @@ use pallas::ledger::traverse::{MultiEraBlock};
 use serde::{Deserialize, Serialize};
 
 use crate::{crosscut, model, prelude::*};
-use pallas::crypto::hash::Hash;
 
 use bech32::{ToBase32, Variant, Error};
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
-use log::error;
 use pallas::ledger::addresses::{Address, StakeAddress};
-
 use std::collections::HashMap;
-use pallas::ledger::addresses::ShelleyPaymentPart::Key;
 
 #[derive(Serialize, Deserialize)]
 struct MultiAssetSingleAgg {
@@ -31,20 +27,11 @@ pub enum Projection {
     Json,
 }
 
-#[derive(Deserialize, Copy, Clone)]
-pub enum StakeIndex {
+#[derive(Deserialize, Copy, Clone, Eq, PartialEq)]
+pub enum Switch {
     On,
     Off,
 }
-
-#[derive(Deserialize, Copy, Clone)]
-pub enum AddressIndex {
-    On,
-    Off,
-}
-
-#[derive(Deserialize, Clone)]
-pub struct KeyPrefix(String);
 
 impl Default for Projection {
     fn default() -> Self {
@@ -52,27 +39,9 @@ impl Default for Projection {
     }
 }
 
-impl Default for StakeIndex {
+impl Default for Switch {
     fn default() -> Self {
         Self::Off
-    }
-}
-
-impl Default for AddressIndex {
-    fn default() -> Self {
-        Self::Off
-    }
-}
-
-impl Into<String> for KeyPrefix {
-    fn into(self) -> String {
-        self.0
-    }
-}
-
-impl Default for KeyPrefix {
-    fn default() -> Self {
-        KeyPrefix(String::from("soa-wallet"))
     }
 }
 
@@ -115,10 +84,10 @@ pub enum AggrType {
 
 #[derive(Deserialize)]
 pub struct Config {
-    pub key_prefix: Option<KeyPrefix>,
+    pub key_prefix: Option<String>,
     pub filter: Option<crosscut::filters::Predicate>,
-    pub stake_index: Option<StakeIndex>,
-    pub address_index: Option<AddressIndex>,
+    pub native_asset_quantity: Option<Switch>,
+    pub native_asset_ownership: Option<Switch>,
     pub projection: Option<Projection>,
 }
 
@@ -150,8 +119,6 @@ impl Reducer {
         output: &mut super::OutputPort,
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
-        let prefix: String = self.config.key_prefix.clone().unwrap_or_default().into();
-
         let mut fingerprint_tallies: HashMap<String, i64> = HashMap::new();
         let mut policy_id_buckets: HashMap<String, String> = HashMap::new();
 
@@ -170,14 +137,36 @@ impl Reducer {
 
         }
 
-        for (fingerprint, quantity) in fingerprint_tallies {
-            let total_asset_count = model::CRDTCommand::HashCounter(
-                format!("{}.{}", prefix, stake_or_address),
-                fingerprint,
-                quantity
-            );
+        if self.config.native_asset_quantity.unwrap_or_default() == Switch::On || self.config.native_asset_ownership.unwrap_or_default() == Switch::On {
+            let prefix = self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string());
 
-            output.send(total_asset_count.into())?;
+            if self.config.native_asset_quantity.unwrap_or_default() == Switch::On {
+                for (fingerprint, quantity) in fingerprint_tallies.clone() {
+                    let total_asset_count = model::CRDTCommand::HashCounter(
+                        format!("{}.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
+                        fingerprint,
+                        quantity
+                    );
+
+                    output.send(total_asset_count.into())?;
+
+                }
+
+            }
+
+            if self.config.native_asset_ownership.unwrap_or_default() == Switch::On {
+                for (fingerprint, quantity) in fingerprint_tallies {
+                    let total_asset_count = model::CRDTCommand::HashCounter(
+                        format!("{}.{}", prefix, stake_or_address),
+                        fingerprint,
+                        quantity
+                    );
+
+                    output.send(total_asset_count.into())?;
+
+                }
+
+            }
 
         }
 
@@ -192,9 +181,6 @@ impl Reducer {
         assets: &Vec<Asset>,
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
-        let prefix: String = self.config.key_prefix.clone().unwrap_or_default().into();
-        let projection = self.config.projection.unwrap_or_default();
-
         let mut fingerprint_tallies: HashMap<String, i64> = HashMap::new();
 
         for asset in assets {
@@ -213,7 +199,7 @@ impl Reducer {
 
         for (fingerprint, quantity) in fingerprint_tallies {
             let total_asset_count = model::CRDTCommand::HashCounter(
-                format!("{}.{}", prefix, stake_or_address),
+                format!("{}.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
                 fingerprint,
                 -quantity
             );
@@ -230,7 +216,7 @@ impl Reducer {
         ctx: &model::BlockContext,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        for (tx_index, tx) in block.txs().into_iter().enumerate() {
+        for (_, tx) in block.txs().into_iter().enumerate() {
             let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
             for (_, meo) in tx.produces() {
                 if let Ok(address) = meo.address() {
@@ -275,6 +261,7 @@ impl Config {
         chain: &crosscut::ChainWellKnownInfo,
         policy: &crosscut::policies::RuntimePolicy,
     ) -> super::Reducer {
+
         let reducer = Reducer {
             config: self,
             chain: chain.clone(),
