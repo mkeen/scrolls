@@ -251,8 +251,8 @@ impl gasket::runtime::Worker for Worker {
                     .incr(key, value)
                     .or_restart()?;
             }
-            model::CRDTCommand::HashSetValue(member, key, value) => {
-                log::debug!("setting hash key {} member {}", member, key);
+            model::CRDTCommand::HashSetValue(key, member, value) => {
+                log::debug!("setting hash key {} member {}", key, member);
 
                 self.connection
                     .as_mut()
