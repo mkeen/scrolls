@@ -33,12 +33,6 @@ pub enum Switch {
     Off,
 }
 
-impl Default for Projection {
-    fn default() -> Self {
-        Self::Cbor
-    }
-}
-
 impl Default for Switch {
     fn default() -> Self {
         Self::Off
@@ -86,9 +80,8 @@ pub enum AggrType {
 pub struct Config {
     pub key_prefix: Option<String>,
     pub filter: Option<crosscut::filters::Predicate>,
-    pub native_asset_quantity: Option<Switch>,
-    pub native_asset_ownership: Option<Switch>,
-    pub projection: Option<Projection>,
+    pub native_asset_quantity_index: Option<Switch>,
+    pub native_asset_ownership_index: Option<Switch>,
 }
 
 pub struct Reducer {
@@ -137,10 +130,13 @@ impl Reducer {
 
         }
 
-        if self.config.native_asset_quantity.unwrap_or_default() == Switch::On || self.config.native_asset_ownership.unwrap_or_default() == Switch::On {
+        let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or_default() == Switch::On;
+        let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or_default() == Switch::On;
+
+        if conf_enable_quantity_index || conf_enable_ownership_index {
             let prefix = self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string());
 
-            if self.config.native_asset_quantity.unwrap_or_default() == Switch::On {
+            if conf_enable_quantity_index {
                 for (fingerprint, quantity) in fingerprint_tallies.clone() {
                     let total_asset_count = model::CRDTCommand::HashCounter(
                         format!("{}.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
@@ -154,12 +150,11 @@ impl Reducer {
 
             }
 
-            if self.config.native_asset_ownership.unwrap_or_default() == Switch::On {
-                for (fingerprint, quantity) in fingerprint_tallies {
-                    let total_asset_count = model::CRDTCommand::HashCounter(
+            if conf_enable_ownership_index {
+                for (fingerprint, _) in fingerprint_tallies {
+                    let total_asset_count = model::CRDTCommand::SetAdd(
                         format!("{}.{}", prefix, stake_or_address),
                         fingerprint,
-                        quantity
                     );
 
                     output.send(total_asset_count.into())?;
@@ -177,7 +172,6 @@ impl Reducer {
         &mut self,
         output: &mut super::OutputPort,
         timestamp: &u64,
-
         assets: &Vec<Asset>,
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
@@ -197,14 +191,35 @@ impl Reducer {
 
         }
 
-        for (fingerprint, quantity) in fingerprint_tallies {
-            let total_asset_count = model::CRDTCommand::HashCounter(
-                format!("{}.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
-                fingerprint,
-                -quantity
-            );
+        let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or_default() == Switch::On;
+        let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or_default() == Switch::On;
 
-            output.send(total_asset_count.into())?;
+        if conf_enable_quantity_index || conf_enable_ownership_index {
+            if conf_enable_quantity_index {
+                for (fingerprint, quantity) in fingerprint_tallies.clone() {
+                    let total_asset_count = model::CRDTCommand::HashCounter(
+                        format!("{}.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
+                        fingerprint,
+                        -quantity
+                    );
+
+                    output.send(total_asset_count.into())?;
+                }
+
+            }
+
+            if conf_enable_ownership_index {
+                for (fingerprint, _) in fingerprint_tallies {
+                    let total_asset_count = model::CRDTCommand::SetRemove(
+                        format!("{}.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
+                        fingerprint
+                    );
+
+                    output.send(total_asset_count.into())?;
+                }
+
+            }
+
         }
 
         Ok(())
@@ -261,7 +276,6 @@ impl Config {
         chain: &crosscut::ChainWellKnownInfo,
         policy: &crosscut::policies::RuntimePolicy,
     ) -> super::Reducer {
-
         let reducer = Reducer {
             config: self,
             chain: chain.clone(),
