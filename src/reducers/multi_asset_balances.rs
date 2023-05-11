@@ -219,10 +219,12 @@ impl Reducer {
         ctx: &model::BlockContext,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
+        log::debug!("running thing");
         for (_, tx) in block.txs().into_iter().enumerate() {
             let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
             for (_, meo) in tx.produces() {
                 let address = meo.address().unwrap();
+                log::debug!("making call");
                 self.process_produced_txo(
                     output,
                     &timestamp,
@@ -235,6 +237,7 @@ impl Reducer {
             for (_, mei) in ctx.find_consumed_txos(&tx, &self.policy).unwrap_or_default() {
                 let address = mei.address().unwrap();
                 let stake_or_address = self.stake_or_address_from_address(&address);
+                log::debug!("making call 2");
                 self.process_spent_txo(
                     output,
                     &timestamp,
