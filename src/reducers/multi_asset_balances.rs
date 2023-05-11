@@ -95,20 +95,20 @@ impl Reducer {
 
     fn process_produced_txo(
         &self,
-        tx_output: &MultiEraOutput,
-        timestamp: &u64,
         output: &mut super::OutputPort,
+        timestamp: &u64,
+        assets: &Vec<Asset>,
         stake_or_address: String,
     ) -> Result<(), gasket::error::Error> {
         let mut fingerprint_tallies: HashMap<String, i64> = HashMap::new();
         let mut policy_id_buckets: HashMap<String, String> = HashMap::new();
 
-        for asset in tx_output.assets() {
+        for asset in assets {
             if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
                 let asset_name = hex::encode(asset_name);
                 if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
                     if !fingerprint.is_empty() && !stake_or_address.is_empty() {
-                        *fingerprint_tallies.entry(fingerprint.clone()).or_insert(quantity as i64) += quantity as i64;
+                        *fingerprint_tallies.entry(fingerprint.clone()).or_insert(*quantity as i64) += (*quantity as i64);
                         policy_id_buckets.entry(fingerprint.to_string()).or_insert(policy_id.to_string());
                     }
 
@@ -118,8 +118,8 @@ impl Reducer {
 
         }
 
-        let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or(false);
-        let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or(false);
+        let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or(true);
+        let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or(true);
 
         if (conf_enable_quantity_index || conf_enable_ownership_index) && !fingerprint_tallies.is_empty() {
             let prefix = self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string());
@@ -179,8 +179,8 @@ impl Reducer {
 
         }
 
-        let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or(false);
-        let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or(false);
+        let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or(true);
+        let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or(true);
 
         if conf_enable_quantity_index || conf_enable_ownership_index {
             if conf_enable_quantity_index {
@@ -222,32 +222,25 @@ impl Reducer {
         for (_, tx) in block.txs().into_iter().enumerate() {
             let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
             for (_, meo) in tx.produces() {
-                if let Ok(address) = meo.address() {
-                    self.process_produced_txo(
-                        &meo,
-                        &timestamp,
-                        output,
-                        self.stake_or_address_from_address(&address),
-                    )?;
-
-                }
+                let address = meo.address().unwrap();
+                self.process_produced_txo(
+                    output,
+                    &timestamp,
+                    &meo.assets(),
+                    self.stake_or_address_from_address(&address),
+                ).unwrap_or_default();
 
             }
 
             for (_, mei) in ctx.find_consumed_txos(&tx, &self.policy).unwrap_or_default() {
-                if let Ok(address) = mei.address() {
-                    let stake_or_address = self.stake_or_address_from_address(&address);
-                    if stake_or_address.len() > 0 {
-                        self.process_spent_txo(
-                            output,
-                            &timestamp,
-                            &mei.assets(),
-                            stake_or_address
-                        )?;
-
-                    }
-
-                }
+                let address = mei.address().unwrap();
+                let stake_or_address = self.stake_or_address_from_address(&address);
+                self.process_spent_txo(
+                    output,
+                    &timestamp,
+                    &mei.assets(),
+                    stake_or_address
+                ).unwrap_or_default();
 
             }
 
