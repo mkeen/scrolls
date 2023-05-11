@@ -77,13 +77,14 @@ impl Reducer {
         ctx: &model::BlockContext,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
+        log::debug!("helllooooo!!");
         for tx in block.txs().into_iter() {
             for consumed in tx.consumes().iter().map(|i| i.output_ref()) {
-                self.process_consumed_txo(&ctx, &consumed, output)?;
+                self.process_consumed_txo(&ctx, &consumed, output).expect("TODO: panic message");
             }
 
             for (idx, produced) in tx.produces() {
-                self.process_produced_txo(&tx, &produced, idx, output)?;
+                self.process_produced_txo(&tx, &produced, idx, output).expect("TODO: panic message");
             }
         }
 

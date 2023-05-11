@@ -98,7 +98,7 @@ impl Reducer {
         output: &mut super::OutputPort,
         timestamp: &u64,
         assets: &Vec<Asset>,
-        stake_or_address: String,
+        stake_or_address: &str,
     ) -> Result<(), gasket::error::Error> {
         let mut fingerprint_tallies: HashMap<String, i64> = HashMap::new();
         let mut policy_id_buckets: HashMap<String, String> = HashMap::new();
@@ -107,8 +107,8 @@ impl Reducer {
             if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
                 let asset_name = hex::encode(asset_name);
                 if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
-                    if !fingerprint.is_empty() && !stake_or_address.is_empty() {
-                        *fingerprint_tallies.entry(fingerprint.clone()).or_insert(*quantity as i64) += (*quantity as i64);
+                    if !fingerprint.is_empty() {
+                        *fingerprint_tallies.entry(fingerprint.clone()).or_insert(0_i64) += (*quantity as i64);
                         policy_id_buckets.entry(fingerprint.to_string()).or_insert(policy_id.to_string());
                     }
 
@@ -230,7 +230,7 @@ impl Reducer {
                     output,
                     &timestamp,
                     &meo.assets(),
-                    self.stake_or_address_from_address(&address),
+                    &self.stake_or_address_from_address(&address),
                 ).unwrap_or_default();
 
             }
