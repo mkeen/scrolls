@@ -27,18 +27,6 @@ pub enum Projection {
     Json,
 }
 
-#[derive(Deserialize, Copy, Clone, Eq, PartialEq)]
-pub enum Switch {
-    On,
-    Off,
-}
-
-impl Default for Switch {
-    fn default() -> Self {
-        Self::Off
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 struct PreviousOwnerAgg {
     address: String,
@@ -80,8 +68,8 @@ pub enum AggrType {
 pub struct Config {
     pub key_prefix: Option<String>,
     pub filter: Option<crosscut::filters::Predicate>,
-    pub native_asset_quantity_index: Option<Switch>,
-    pub native_asset_ownership_index: Option<Switch>,
+    pub native_asset_quantity_index: Option<bool>,
+    pub native_asset_ownership_index: Option<bool>,
 }
 
 pub struct Reducer {
@@ -130,8 +118,8 @@ impl Reducer {
 
         }
 
-        let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or_default() == Switch::On;
-        let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or_default() == Switch::On;
+        let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or(false);
+        let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or(false);
 
         if conf_enable_quantity_index || conf_enable_ownership_index {
             let prefix = self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string());
@@ -152,7 +140,7 @@ impl Reducer {
 
             if conf_enable_ownership_index {
                 for (fingerprint, _) in fingerprint_tallies {
-                    let total_asset_count = model::CRDTCommand::SetAdd(
+                    let total_asset_count = model::CRDTCommand::BlindSetAdd(
                         format!("{}.{}", prefix, stake_or_address),
                         fingerprint,
                     );
@@ -191,8 +179,8 @@ impl Reducer {
 
         }
 
-        let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or_default() == Switch::On;
-        let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or_default() == Switch::On;
+        let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or(false);
+        let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or(false);
 
         if conf_enable_quantity_index || conf_enable_ownership_index {
             if conf_enable_quantity_index {
@@ -210,7 +198,7 @@ impl Reducer {
 
             if conf_enable_ownership_index {
                 for (fingerprint, _) in fingerprint_tallies {
-                    let total_asset_count = model::CRDTCommand::SetRemove(
+                    let total_asset_count = model::CRDTCommand::BlindSetRemove(
                         format!("{}.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
                         fingerprint
                     );

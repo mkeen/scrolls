@@ -100,6 +100,9 @@ impl gasket::runtime::Worker for Worker {
             model::CRDTCommand::BlindSetAdd(key, value) => {
                 log::debug!("blindly, adding to set [{}], value [{}]", key, value);
             }
+            model::CRDTCommand::BlindSetRemove(key, value) => {
+                log::debug!("blindly, adding to set [{}], value [{}]", key, value);
+            }
             model::CRDTCommand::SetAdd(key, value) => {
                 log::debug!("adding to set [{}], value [{}]", key, value);
             }
