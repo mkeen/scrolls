@@ -127,7 +127,7 @@ impl Reducer {
             if conf_enable_quantity_index {
                 for (fingerprint, quantity) in fingerprint_tallies.clone() {
                     let total_asset_count = model::CRDTCommand::HashCounter(
-                        format!("{}.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
+                        format!("{}.{}.tally", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
                         fingerprint,
                         quantity
                     );
@@ -141,7 +141,7 @@ impl Reducer {
             if conf_enable_ownership_index {
                 for (fingerprint, _) in fingerprint_tallies {
                     let total_asset_count = model::CRDTCommand::BlindSetAdd(
-                        format!("{}.{}", prefix, stake_or_address),
+                        format!("{}.{}.owns", prefix, stake_or_address),
                         fingerprint,
                     );
 
@@ -186,7 +186,7 @@ impl Reducer {
             if conf_enable_quantity_index {
                 for (fingerprint, quantity) in fingerprint_tallies.clone() {
                     let total_asset_count = model::CRDTCommand::HashCounter(
-                        format!("{}.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
+                        format!("{}.{}.tally", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
                         fingerprint,
                         -quantity
                     );
@@ -199,7 +199,7 @@ impl Reducer {
             if conf_enable_ownership_index {
                 for (fingerprint, _) in fingerprint_tallies {
                     let total_asset_count = model::CRDTCommand::BlindSetRemove(
-                        format!("{}.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
+                        format!("{}.{}.owns", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
                         fingerprint
                     );
 
