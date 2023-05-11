@@ -121,7 +121,7 @@ impl Reducer {
         let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or(false);
         let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or(false);
 
-        if conf_enable_quantity_index || conf_enable_ownership_index {
+        if (conf_enable_quantity_index || conf_enable_ownership_index) && !fingerprint_tallies.is_empty() {
             let prefix = self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string());
 
             if conf_enable_quantity_index {
