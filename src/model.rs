@@ -285,7 +285,7 @@ impl CRDTCommand {
             None => key.to_string(),
         };
 
-        CRDTCommand::HashCounter(member, key, delta)
+        CRDTCommand::HashCounter(key, member, delta)
     }
 
     pub fn block_finished(block: &MultiEraBlock) -> CRDTCommand {
