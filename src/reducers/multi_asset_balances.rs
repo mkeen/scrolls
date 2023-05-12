@@ -141,7 +141,7 @@ impl Reducer {
 
             if conf_enable_ownership_index {
                 for (fingerprint, _) in fingerprint_tallies {
-                    let total_asset_count = model::CRDTCommand::BlindSetAdd(
+                    let total_asset_count = model::CRDTCommand::SetAdd(
                         format!("{}.{}.owns", prefix, stake_or_address),
                         fingerprint,
                     );
@@ -199,7 +199,7 @@ impl Reducer {
 
             if conf_enable_ownership_index {
                 for fingerprint in fingerprint_tallies.keys() {
-                    let total_asset_count = model::CRDTCommand::BlindSetRemove(
+                    let total_asset_count = model::CRDTCommand::SetRemove(
                         format!("{}.{}.owns", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
                         fingerprint.into()
                     );

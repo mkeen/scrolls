@@ -82,7 +82,7 @@ impl Bootstrapper {
                 self.output,
             ),
             gasket::runtime::Policy {
-                tick_timeout: Some(Duration::from_secs(600)),
+                tick_timeout: Some(Duration::from_secs(3600)),
                 bootstrap_retry: gasket::retries::Policy {
                     max_retries: 20,
                     backoff_factor: 2,
