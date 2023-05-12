@@ -1,5 +1,5 @@
 use std::panic;
-use pallas::ledger::traverse::{Asset, MultiEraOutput, MultiEraTx};
+use pallas::ledger::traverse::{Asset, MultiEraInput, MultiEraOutput, MultiEraTx};
 use pallas::ledger::traverse::{MultiEraBlock};
 use serde::{Deserialize, Serialize};
 
@@ -92,28 +92,47 @@ impl Reducer {
 
     }
 
-    fn process_block<'b>(
+    fn process_spent(
         &self,
         output: &mut super::OutputPort,
-        block: &'b MultiEraBlock<'b>
+        mei: &MultiEraInput,
+        ctx: &model::BlockContext,
     ) -> Result<(), gasket::error::Error> {
         let mut fingerprint_tallies: HashMap<String, HashMap<String, i64>> = HashMap::new();
 
-        for (_, tx) in block.txs().into_iter().enumerate() {
-            let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
-            for (_, meo) in tx.produces() {
-                let address = self.stake_or_address_from_address(&meo.address().unwrap());
-                for asset in meo.assets() {
-                    if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
-                        let asset_name = hex::encode(asset_name);
-                        if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
-                            if !fingerprint.is_empty() {
-                                *fingerprint_tallies.entry(address.to_string()).or_insert(HashMap::new()).entry(fingerprint.clone()).or_insert(0_i64) += quantity as i64;
-                            }
+        let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or(true);
+        let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or(true);
+        let prefix = self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string());
 
+        if let Ok(spent_output) = ctx.find_utxo(&mei.output_ref()) {
+            let spent_from_soa = self.stake_or_address_from_address(&spent_output.address().unwrap());
+
+            for asset in spent_output.non_ada_assets() {
+                if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
+                    let asset_name = hex::encode(asset_name);
+
+                    if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
+                        if !fingerprint.is_empty() {
+                            *fingerprint_tallies.entry(spent_from_soa.to_string()).or_insert(HashMap::new()).entry(fingerprint.clone()).or_insert(0_i64) -= quantity as i64;
                         }
 
-                    };
+                    }
+
+                };
+
+            }
+
+            if !fingerprint_tallies.is_empty() && conf_enable_quantity_index {
+                for (soa, quantity_map) in fingerprint_tallies.clone() {
+                    for (fingerprint, quantity) in quantity_map {
+                        let total_asset_count = model::CRDTCommand::HashCounter(
+                            format!("{}.{}.tally", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), soa),
+                            fingerprint,
+                            quantity
+                        );
+
+                        output.send(total_asset_count.into())?;
+                    }
 
                 }
 
@@ -121,14 +140,38 @@ impl Reducer {
 
         }
 
+        Ok(())
+    }
 
+    fn process_received(
+        &self,
+        output: &mut super::OutputPort,
+        meo: &MultiEraOutput,
+    ) -> Result<(), gasket::error::Error> {
+        let mut fingerprint_tallies: HashMap<String, HashMap<String, i64>> = HashMap::new();
 
         let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or(true);
         let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or(true);
+        let prefix = self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string());
+
+        let received_to_soa = self.stake_or_address_from_address(&meo.address().unwrap());
+
+        for asset in meo.non_ada_assets() {
+            if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
+                let asset_name = hex::encode(asset_name);
+
+                if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
+                    if !fingerprint.is_empty() {
+                        *fingerprint_tallies.entry(received_to_soa.to_string()).or_insert(HashMap::new()).entry(fingerprint.clone()).or_insert(0_i64) += quantity as i64;
+                    }
+
+                }
+
+            };
+
+        }
 
         if !fingerprint_tallies.is_empty() && (conf_enable_quantity_index || conf_enable_ownership_index) {
-            let prefix = self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string());
-
             if conf_enable_quantity_index {
                 for (soa, quantity_map) in fingerprint_tallies.clone() {
                     for (fingerprint, quantity) in quantity_map {
@@ -148,7 +191,7 @@ impl Reducer {
             if conf_enable_ownership_index {
                 for (soa, quantity_map) in fingerprint_tallies.clone() {
                     for (fingerprint, _) in quantity_map {
-                        let total_asset_count = model::CRDTCommand::SetAdd(
+                        let total_asset_count = model::CRDTCommand::BlindSetAdd(
                             format!("{}.{}.owns", prefix, soa),
                             fingerprint,
                         );
@@ -162,62 +205,6 @@ impl Reducer {
 
         }
 
-        Ok(())
-    }
-
-    fn process_spent_txo(
-        &mut self,
-        output: &mut super::OutputPort,
-        timestamp: &u64,
-        assets: &Vec<Asset>,
-        stake_or_address: String,
-    ) -> Result<(), gasket::error::Error> {
-        let mut fingerprint_tallies: HashMap<String, i64> = HashMap::new();
-
-        for asset in assets {
-            if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
-                let asset_name = hex::encode(asset_name);
-                if let Ok(fingerprint) = asset_fingerprint([policy_id.to_string().as_str(), asset_name.as_str()]) {
-                    if !fingerprint.is_empty() && !stake_or_address.is_empty() {
-                        *fingerprint_tallies.entry(fingerprint).or_insert(*quantity as i64) += *quantity as i64;
-                    }
-
-                }
-
-            };
-
-        }
-
-        let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or(true);
-        let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or(true);
-
-        if !fingerprint_tallies.is_empty() && (conf_enable_quantity_index || conf_enable_ownership_index) {
-            if conf_enable_quantity_index {
-                for (fingerprint, &quantity) in &fingerprint_tallies {
-                    let total_asset_count = model::CRDTCommand::HashCounter(
-                        format!("{}.{}.tally", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
-                        fingerprint.into(),
-                        -quantity
-                    );
-
-                    output.send(total_asset_count.into())?;
-                }
-
-            }
-
-            if conf_enable_ownership_index {
-                for fingerprint in fingerprint_tallies.keys() {
-                    let total_asset_count = model::CRDTCommand::SetRemove(
-                        format!("{}.{}.owns", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), stake_or_address),
-                        fingerprint.into()
-                    );
-
-                    output.send(total_asset_count.into())?;
-                }
-
-            }
-
-        }
 
         Ok(())
     }
@@ -228,11 +215,15 @@ impl Reducer {
         ctx: &model::BlockContext,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        log::info!("running thing");
-        self.process_block(
-            output,
-            block,
-        ).unwrap_or_default();
+        for tx in block.txs() {
+            for consumes in tx.consumes().iter() {
+                self.process_spent(output, consumes, ctx)?;
+            }
+
+            for (_, produces) in tx.produces().iter() {
+                self.process_received(output, produces)?;
+            }
+        }
 
         Ok(())
     }
