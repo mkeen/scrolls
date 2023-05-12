@@ -275,7 +275,7 @@ impl gasket::runtime::Worker for Worker {
                 self.connection
                     .as_mut()
                     .unwrap()
-                    .hincr(member, key, delta)
+                    .hincr(key, member, delta)
                     .or_restart()?;
             }
             model::CRDTCommand::HashUnsetKey(key, member) => {
