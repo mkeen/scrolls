@@ -82,12 +82,12 @@ impl Reducer {
     fn stake_or_address_from_address(&self, address: &Address) -> String {
         match address {
             Address::Shelley(s) => match StakeAddress::try_from(s.clone()).ok() {
-                Some(x) => x.to_bech32().unwrap_or(address.to_bech32().unwrap()),
-                _ => address.to_bech32().unwrap_or(address.to_bech32().unwrap()),
+                Some(x) => x.to_bech32().unwrap_or(address.to_string()),
+                _ => address.to_bech32().unwrap_or(address.to_string()),
             },
 
-            Address::Byron(_) => address.to_bech32().unwrap_or(address.to_bech32().unwrap()),
-            Address::Stake(_) => address.to_bech32().unwrap_or(address.to_bech32().unwrap()),
+            Address::Byron(_) => address.to_string(),
+            Address::Stake(stake) => stake.to_bech32().unwrap_or(address.to_string()),
         }
 
     }
