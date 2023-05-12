@@ -266,7 +266,7 @@ impl gasket::runtime::Worker for Worker {
                 self.connection
                     .as_mut()
                     .unwrap()
-                    .hset(member, key, value)
+                    .hset(key, member, value)
                     .or_restart()?;
             }
             model::CRDTCommand::HashCounter(key, member, delta) => {
