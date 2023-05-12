@@ -49,7 +49,6 @@ fn asset_fingerprint(
 ) -> Result<String, Error> {
     let combined_parts = data_list.join("");
     let raw = hex::decode(combined_parts).unwrap();
-
     let mut hasher = Blake2bVar::new(20).unwrap();
     hasher.update(&raw);
     let mut buf = [0u8; 20];
@@ -83,12 +82,12 @@ impl Reducer {
     fn stake_or_address_from_address(&self, address: &Address) -> String {
         match address {
             Address::Shelley(s) => match StakeAddress::try_from(s.clone()).ok() {
-                Some(x) => x.to_bech32().unwrap_or(String::new()),
-                _ => address.to_bech32().unwrap_or(String::new()),
+                Some(x) => x.to_bech32().unwrap_or(address.to_bech32().unwrap()),
+                _ => address.to_bech32().unwrap_or(address.to_bech32().unwrap()),
             },
 
-            Address::Byron(_) => address.to_bech32().unwrap_or(String::new()),
-            Address::Stake(_) => address.to_bech32().unwrap_or(String::new()),
+            Address::Byron(_) => address.to_bech32().unwrap_or(address.to_bech32().unwrap()),
+            Address::Stake(_) => address.to_bech32().unwrap_or(address.to_bech32().unwrap()),
         }
 
     }
