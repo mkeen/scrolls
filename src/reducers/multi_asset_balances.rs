@@ -72,8 +72,6 @@ pub enum AggrType {
 pub struct Config {
     pub key_prefix: Option<String>,
     pub filter: Option<crosscut::filters::Predicate>,
-    pub native_asset_quantity_index: Option<bool>,
-    pub native_asset_ownership_index: Option<bool>,
 }
 
 pub struct Reducer {
@@ -152,31 +150,27 @@ impl Reducer {
     ) -> Result<(), gasket::error::Error> {
         let mut policy_asset_supply: HashMap<String, HashMap<String, i64>> = HashMap::new();
 
-        let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or(true);
         let prefix = self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string());
 
-        if conf_enable_ownership_index {
-            for (policy_id, policy_assets) in mint.iter() {
-                for (policy_asset, mint_quantity) in policy_assets.iter() {
-                    if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), policy_asset.to_string().as_str()]) {
-                        *policy_asset_supply.entry(policy_id.to_string()).or_insert(HashMap::new()).entry(fingerprint.to_string()).or_insert(0) += mint_quantity
-                    }
-
+        for (policy_id, policy_assets) in mint.iter() {
+            for (policy_asset, mint_quantity) in policy_assets.iter() {
+                if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), policy_asset.to_string().as_str()]) {
+                    *policy_asset_supply.entry(policy_id.to_string()).or_insert(HashMap::new()).entry(fingerprint.to_string()).or_insert(0) += mint_quantity
                 }
 
             }
 
-            for (policy_id, assets) in policy_asset_supply {
-                for (fingerprint, quantity) in assets {
-                    let policy_assets_list = model::CRDTCommand::SortedSetAdd(
-                        format!("{}.{}", prefix, policy_id),
-                        fingerprint,
-                        quantity as Delta,
-                    );
+        }
 
-                    output.send(policy_assets_list.into())?;
-                }
+        for (policy_id, assets) in policy_asset_supply {
+            for (fingerprint, quantity) in assets {
+                let policy_assets_list = model::CRDTCommand::SortedSetAdd(
+                    format!("{}.{}", prefix, policy_id),
+                    fingerprint,
+                    quantity as Delta,
+                );
 
+                output.send(policy_assets_list.into())?;
             }
 
         }
@@ -287,22 +281,16 @@ impl Reducer {
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         for tx in block.txs() {
-            if self.config.native_asset_ownership_index.unwrap_or(true) {
-                if let Some(mint) = tx.mint().as_alonzo() {
-                    self.process_minted_or_burned(output, mint)?;
-                }
-
+            if let Some(mint) = tx.mint().as_alonzo() {
+                self.process_minted_or_burned(output, mint)?;
             }
 
-            if self.config.native_asset_quantity_index.unwrap_or(true) || self.config.native_asset_ownership_index.unwrap_or(true) {
-                for consumes in tx.consumes().iter() {
-                    self.process_spent(output, consumes, ctx)?;
-                }
+            for consumes in tx.consumes().iter() {
+                self.process_spent(output, consumes, ctx)?;
+            }
 
-                for (_, produces) in tx.produces().iter() {
-                    self.process_received(output, produces)?;
-                }
-
+            for (_, produces) in tx.produces().iter() {
+                self.process_received(output, produces)?;
             }
 
         }
