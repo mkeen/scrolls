@@ -228,10 +228,11 @@ impl Reducer {
     fn process_asset_movement(
         &self,
         output: &mut super::OutputPort,
-        address: &String,
+        soa: &String,
         lovelace: u64,
         assets: &Vec<Asset>,
         spending: bool,
+        slot: u64,
     ) {
         let adjusted_lovelace = match spending {
             true => -(lovelace as i64),
@@ -239,7 +240,7 @@ impl Reducer {
         };
 
         let (fingerprint_tallies, policy_asset_owners) = self.calculate_address_asset_balance_offsets(
-            address,
+            soa,
             &adjusted_lovelace,
             assets,
             spending
@@ -249,12 +250,20 @@ impl Reducer {
             output.send(message.into());
         }
 
+        let policy_assets_list = model::CRDTCommand::AnyWriteWins(
+            format!("{}.last-activity.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), soa),
+            self.time.slot_to_wallclock(slot).to_string().into(),
+        );
+
+        output.send(policy_assets_list.into());
+
     }
 
     fn process_received(
         &self,
         output: &mut super::OutputPort,
         meo: &MultiEraOutput,
+        slot: u64,
     ) -> Result<(), gasket::error::Error> {
         let received_to_soa = self.stake_or_address_from_address(&meo.address().unwrap());
 
@@ -263,7 +272,8 @@ impl Reducer {
             &received_to_soa,
             meo.lovelace_amount(),
             &meo.non_ada_assets(),
-            false
+            false,
+            slot
         );
 
         Ok(())
@@ -274,6 +284,7 @@ impl Reducer {
         output: &mut super::OutputPort,
         mei: &MultiEraInput,
         ctx: &model::BlockContext,
+        slot: u64,
     ) -> Result<(), gasket::error::Error> {
         if let Ok(spent_output) = ctx.find_utxo(&mei.output_ref()) {
             let spent_from_soa = self.stake_or_address_from_address(&spent_output.address().unwrap());
@@ -283,7 +294,8 @@ impl Reducer {
                 &spent_from_soa,
                 spent_output.lovelace_amount(),
                 &spent_output.non_ada_assets(),
-                true
+                true,
+                slot,
             );
 
         }
@@ -297,17 +309,19 @@ impl Reducer {
         ctx: &model::BlockContext,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
+        let slot = block.slot();
+
         for tx in block.txs() {
             if let Some(mint) = tx.mint().as_alonzo() {
                 self.process_minted_or_burned(output, mint)?;
             }
 
             for consumes in tx.consumes().iter() {
-                self.process_spent(output, consumes, ctx)?;
+                self.process_spent(output, consumes, ctx, slot)?;
             }
 
             for (_, produces) in tx.produces().iter() {
-                self.process_received(output, produces)?;
+                self.process_received(output, produces, slot)?;
             }
 
         }
