@@ -143,6 +143,53 @@ impl Reducer {
         messages
     }
 
+    fn calculate_address_asset_balance_offsets(
+        &self,
+        address: &String,
+        lovelace: &i64,
+        assets: &Vec<Asset>,
+        spending: bool,
+    ) -> (HashMap<String, HashMap<String, i64>>, HashMap<String, HashMap<String, Vec<(String, i64)>>>) {
+        let mut fingerprint_tallies: HashMap<String, HashMap<String, i64>> = HashMap::new();
+        let mut policy_asset_owners: HashMap<String, HashMap<String, Vec<(String, i64)>>> = HashMap::new();
+
+        for asset in assets.clone() {
+            if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
+                let asset_name = hex::encode(asset_name);
+
+                if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
+                    if !fingerprint.is_empty() {
+                        let adjusted_quality: i64 = match spending {
+                            true => -(quantity as i64),
+                            false => quantity as i64
+                        };
+
+                        *fingerprint_tallies.entry(address.clone())
+                            .or_insert(HashMap::new())
+                            .entry(fingerprint.clone())
+                            .or_insert(0_i64) += adjusted_quality;
+
+                        policy_asset_owners.entry(policy_id.clone().to_string())
+                            .or_insert(HashMap::new())
+                            .entry(fingerprint)
+                            .or_insert(Vec::new())
+                            .push((address.clone(), adjusted_quality));
+                    }
+
+                }
+
+            };
+
+        }
+
+        *fingerprint_tallies.entry(address.to_string())
+            .or_insert(HashMap::new())
+            .entry("lovelace".to_string())
+            .or_insert(0) += *lovelace;
+
+        (fingerprint_tallies, policy_asset_owners)
+    }
+
     fn process_minted_or_burned(
         &self,
         output: &mut super::OutputPort,
@@ -178,44 +225,46 @@ impl Reducer {
         Ok(())
     }
 
+    fn process_asset_movement(
+        &self,
+        output: &mut super::OutputPort,
+        address: &String,
+        lovelace: u64,
+        assets: &Vec<Asset>,
+        spending: bool,
+    ) {
+        let adjusted_lovelace = match spending {
+            true => -(lovelace as i64),
+            false => lovelace as i64
+        };
+
+        let (fingerprint_tallies, policy_asset_owners) = self.calculate_address_asset_balance_offsets(
+            address,
+            &adjusted_lovelace,
+            assets,
+            spending
+        );
+
+        for message in self.reconcile_asset_movement(&fingerprint_tallies, &policy_asset_owners) {
+            output.send(message.into());
+        }
+
+    }
+
     fn process_received(
         &self,
         output: &mut super::OutputPort,
         meo: &MultiEraOutput,
     ) -> Result<(), gasket::error::Error> {
-        let mut fingerprint_tallies: HashMap<String, HashMap<String, i64>> = HashMap::new();
-        let mut policy_asset_owners: HashMap<String, HashMap<String, Vec<(String, i64)>>> = HashMap::new();
-
         let received_to_soa = self.stake_or_address_from_address(&meo.address().unwrap());
 
-        for asset in meo.non_ada_assets() {
-            if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
-                let asset_name = hex::encode(asset_name);
-
-                if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
-                    if !fingerprint.is_empty() {
-                        *fingerprint_tallies.entry(received_to_soa.clone()).or_insert(HashMap::new()).entry(fingerprint.clone()).or_insert(0_i64) += quantity as i64;
-                        policy_asset_owners.entry(policy_id.clone().to_string())
-                            .or_insert(HashMap::new())
-                            .entry(fingerprint)
-                            .or_insert(Vec::new())
-                            .push((received_to_soa.clone(), quantity as i64));
-                    }
-
-                }
-
-            };
-
-        }
-
-        *fingerprint_tallies.entry(received_to_soa)
-            .or_insert(HashMap::new())
-            .entry("lovelace".to_string())
-            .or_insert(0) += meo.lovelace_amount() as i64;
-
-        for message in self.reconcile_asset_movement(&fingerprint_tallies, &policy_asset_owners) {
-            output.send(message.into())?;
-        }
+        self.process_asset_movement(
+            output,
+            &received_to_soa,
+            meo.lovelace_amount(),
+            &meo.non_ada_assets(),
+            false
+        );
 
         Ok(())
     }
@@ -226,50 +275,18 @@ impl Reducer {
         mei: &MultiEraInput,
         ctx: &model::BlockContext,
     ) -> Result<(), gasket::error::Error> {
-        let mut fingerprint_tallies: HashMap<String, HashMap<String, i64>> = HashMap::new();
-        let mut policy_asset_owners: HashMap<String, HashMap<String, Vec<(String, i64)>>> = HashMap::new();
-
         if let Ok(spent_output) = ctx.find_utxo(&mei.output_ref()) {
             let spent_from_soa = self.stake_or_address_from_address(&spent_output.address().unwrap());
 
-            for asset in spent_output.non_ada_assets() {
-                if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
-                    let asset_name = hex::encode(asset_name);
-
-                    if let Ok(fingerprint) = asset_fingerprint([
-                        policy_id.clone().to_string().as_str(),
-                        asset_name.as_str()
-                    ]) {
-                        if !fingerprint.is_empty() {
-                            *fingerprint_tallies.entry(spent_from_soa.to_string())
-                                .or_insert(HashMap::new())
-                                .entry(fingerprint.clone())
-                                .or_insert(0_i64) -= quantity as i64;
-
-                            policy_asset_owners.entry(policy_id.clone().to_string())
-                                .or_insert(HashMap::new())
-                                .entry(fingerprint)
-                                .or_insert(Vec::new())
-                                .push((spent_from_soa.clone(), -(quantity as i64)));
-                        }
-
-                    }
-
-                };
-
-            }
-
-            *fingerprint_tallies.entry(spent_from_soa)
-                .or_insert(HashMap::new())
-                .entry("lovelace".to_string())
-                .or_insert(0) -= spent_output.lovelace_amount() as i64;
-
-            for message in self.reconcile_asset_movement(&fingerprint_tallies, &policy_asset_owners) {
-                output.send(message.into())?;
-            }
+            self.process_asset_movement(
+                output,
+                &spent_from_soa,
+                spent_output.lovelace_amount(),
+                &spent_output.non_ada_assets(),
+                true
+            );
 
         }
-
 
         Ok(())
     }
