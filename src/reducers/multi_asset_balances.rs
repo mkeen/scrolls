@@ -11,6 +11,7 @@ use blake2::Blake2bVar;
 use pallas::ledger::addresses::{Address, StakeAddress};
 use std::collections::HashMap;
 use std::str::from_utf8;
+use crate::model::Delta;
 
 #[derive(Serialize, Deserialize)]
 struct MultiAssetSingleAgg {
@@ -150,14 +151,16 @@ impl Reducer {
                     for (policy_id, asset_to_owner) in policy_asset_owners.clone() {
                         for (fingerprint, soas) in asset_to_owner {
                             for soa in soas {
-                                let policy_assets_list = model::CRDTCommand::BlindSetRemove(
+                                let policy_assets_list = model::CRDTCommand::SortedSetAdd(
                                     format!("{}.{}.assets", prefix, policy_id),
-                                    fingerprint.clone()
+                                    fingerprint.clone(),
+                                    -1 as Delta,
                                 );
 
-                                let asset_owners_list = model::CRDTCommand::BlindSetAdd(
+                                let asset_owners_list = model::CRDTCommand::SortedSetAdd(
                                     format!("{}.{}.ownership", prefix, fingerprint),
-                                    soa
+                                    soa,
+                                    1 as Delta
                                 );
 
                                 output.send(asset_owners_list.into())?;
