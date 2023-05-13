@@ -171,15 +171,6 @@ impl gasket::runtime::Worker for Worker {
                     .sadd(key, value)
                     .or_restart()?;
             }
-            model::CRDTCommand::BlindSetAdd(key, value) => {
-                log::debug!("blindly adding to set [{}], value [{}]", key, value);
-
-                self.connection
-                    .as_mut()
-                    .unwrap()
-                    .sadd(key, value)
-                    .or_dismiss()?;
-            }
             model::CRDTCommand::SetRemove(key, value) => {
                 log::debug!("removing from set [{}], value [{}]", key, value);
 
@@ -188,15 +179,6 @@ impl gasket::runtime::Worker for Worker {
                     .unwrap()
                     .srem(key, value)
                     .or_restart()?;
-            }
-            model::CRDTCommand::BlindSetRemove(key, value) => {
-                log::debug!("blindly adding to set [{}], value [{}]", key, value);
-
-                self.connection
-                    .as_mut()
-                    .unwrap()
-                    .srem(key, value)
-                    .or_dismiss()?;
             }
             model::CRDTCommand::LastWriteWins(key, value, ts) => {
                 log::debug!("last write for [{}], slot [{}]", key, ts);
