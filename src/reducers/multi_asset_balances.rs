@@ -10,6 +10,7 @@ use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
 use pallas::ledger::addresses::{Address, StakeAddress};
 use std::collections::HashMap;
+use std::str::from_utf8;
 
 #[derive(Serialize, Deserialize)]
 struct MultiAssetSingleAgg {
@@ -99,6 +100,7 @@ impl Reducer {
         ctx: &model::BlockContext,
     ) -> Result<(), gasket::error::Error> {
         let mut fingerprint_tallies: HashMap<String, HashMap<String, i64>> = HashMap::new();
+        let mut policy_asset_owners: HashMap<String, HashMap<String, Vec<String>>> = HashMap::new();
 
         let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or(true);
         let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or(true);
@@ -114,6 +116,11 @@ impl Reducer {
                     if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
                         if !fingerprint.is_empty() {
                             *fingerprint_tallies.entry(spent_from_soa.to_string()).or_insert(HashMap::new()).entry(fingerprint.clone()).or_insert(0_i64) -= quantity as i64;
+                            policy_asset_owners.entry(policy_id.clone().to_string())
+                                .or_insert(HashMap::new())
+                                .entry(fingerprint)
+                                .or_insert(Vec::new())
+                                .push(spent_from_soa.clone());
                         }
 
                     }
@@ -122,16 +129,43 @@ impl Reducer {
 
             }
 
-            if !fingerprint_tallies.is_empty() && conf_enable_quantity_index {
-                for (soa, quantity_map) in fingerprint_tallies.clone() {
-                    for (fingerprint, quantity) in quantity_map {
-                        let total_asset_count = model::CRDTCommand::HashCounter(
-                            format!("{}.{}.tally", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), soa),
-                            fingerprint,
-                            quantity
-                        );
+            if !fingerprint_tallies.is_empty() && (conf_enable_quantity_index || conf_enable_ownership_index) {
+                if !fingerprint_tallies.is_empty() && conf_enable_quantity_index {
+                    for (soa, quantity_map) in fingerprint_tallies.clone() {
+                        for (fingerprint, quantity) in quantity_map {
+                            let total_asset_count = model::CRDTCommand::HashCounter(
+                                format!("{}.{}.tally", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), soa),
+                                fingerprint,
+                                quantity
+                            );
 
-                        output.send(total_asset_count.into())?;
+                            output.send(total_asset_count.into())?;
+                        }
+
+                    }
+
+                }
+
+                if !policy_asset_owners.is_empty() && conf_enable_ownership_index {
+                    for (policy_id, asset_to_owner) in policy_asset_owners.clone() {
+                        for (fingerprint, soas) in asset_to_owner {
+                            for soa in soas {
+                                let policy_assets_list = model::CRDTCommand::BlindSetRemove(
+                                    format!("{}.{}.assets", prefix, policy_id),
+                                    fingerprint.clone()
+                                );
+
+                                let asset_owners_list = model::CRDTCommand::BlindSetAdd(
+                                    format!("{}.{}.ownership", prefix, fingerprint),
+                                    soa
+                                );
+
+                                output.send(asset_owners_list.into())?;
+                                output.send(policy_assets_list.into())?;
+                            }
+
+                        }
+
                     }
 
                 }
@@ -149,12 +183,13 @@ impl Reducer {
         meo: &MultiEraOutput,
     ) -> Result<(), gasket::error::Error> {
         let mut fingerprint_tallies: HashMap<String, HashMap<String, i64>> = HashMap::new();
+        let mut policy_asset_owners: HashMap<String, HashMap<String, Vec<String>>> = HashMap::new();
 
         let conf_enable_quantity_index = self.config.native_asset_quantity_index.unwrap_or(true);
         let conf_enable_ownership_index = self.config.native_asset_ownership_index.unwrap_or(true);
         let prefix = self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string());
 
-        let received_to_soa = self.stake_or_address_from_address(&meo.address().unwrap());
+        let received_to_soa = self.stake_or_address_from_address(&meo.address().unwrap()).clone();
 
         for asset in meo.non_ada_assets() {
             if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
@@ -162,7 +197,12 @@ impl Reducer {
 
                 if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
                     if !fingerprint.is_empty() {
-                        *fingerprint_tallies.entry(received_to_soa.to_string()).or_insert(HashMap::new()).entry(fingerprint.clone()).or_insert(0_i64) += quantity as i64;
+                        *fingerprint_tallies.entry(received_to_soa.clone()).or_insert(HashMap::new()).entry(fingerprint.clone()).or_insert(0_i64) += quantity as i64;
+                        policy_asset_owners.entry(policy_id.clone().to_string())
+                            .or_insert(HashMap::new())
+                            .entry(fingerprint)
+                            .or_insert(Vec::new())
+                            .push(received_to_soa.clone());
                     }
 
                 }
@@ -176,7 +216,7 @@ impl Reducer {
                 for (soa, quantity_map) in fingerprint_tallies.clone() {
                     for (fingerprint, quantity) in quantity_map {
                         let total_asset_count = model::CRDTCommand::HashCounter(
-                            format!("{}.{}.tally", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), soa),
+                            format!("{}.{}.tally", prefix, soa),
                             fingerprint,
                             quantity
                         );
@@ -188,17 +228,26 @@ impl Reducer {
 
             }
 
-            if conf_enable_ownership_index {
-                for (soa, quantity_map) in fingerprint_tallies.clone() {
-                    for (fingerprint, _) in quantity_map {
-                        let total_asset_count = model::CRDTCommand::BlindSetAdd(
-                            format!("{}.{}.owns", prefix, soa),
-                            fingerprint,
-                        );
+            if !policy_asset_owners.is_empty() && conf_enable_ownership_index {
+                for (policy_id, asset_to_owner) in policy_asset_owners.clone() {
+                    for (fingerprint, soas) in asset_to_owner {
+                        for soa in soas {
+                            let policy_assets_list = model::CRDTCommand::BlindSetAdd(
+                                format!("{}.{}.assets", prefix, policy_id),
+                                fingerprint.clone()
+                            );
 
-                        output.send(total_asset_count.into())?;
+                            let asset_owners_list = model::CRDTCommand::BlindSetAdd(
+                                format!("{}.{}.ownership", prefix, fingerprint),
+                                soa
+                            );
+
+                            output.send(asset_owners_list.into())?;
+                            output.send(policy_assets_list.into())?;
+                        }
+
+
                     }
-
                 }
 
             }
