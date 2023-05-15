@@ -38,15 +38,10 @@ struct PreviousOwnerAgg {
     transferred_out: i64,
 }
 
-impl PreviousOwnerAgg {
-    fn new(address: &str, transferred_out: u64) -> PreviousOwnerAgg {
-        PreviousOwnerAgg {
-            address: address.to_string(),
-            transferred_out: transferred_out.try_into().unwrap(),
-        }
-
-    }
-
+#[derive(Deserialize)]
+pub struct Config {
+    pub key_prefix: Option<String>,
+    pub filter: Option<crosscut::filters::Predicate>,
 }
 
 fn asset_fingerprint(
@@ -60,18 +55,6 @@ fn asset_fingerprint(
     hasher.finalize_variable(&mut buf).unwrap();
     let base32_combined = buf.to_base32();
     bech32::encode("asset", base32_combined, Variant::Bech32)
-}
-
-#[derive(Deserialize, Copy, Clone)]
-pub enum AggrType {
-    Epoch,
-
-}
-
-#[derive(Deserialize)]
-pub struct Config {
-    pub key_prefix: Option<String>,
-    pub filter: Option<crosscut::filters::Predicate>,
 }
 
 pub struct Reducer {
@@ -113,7 +96,9 @@ impl Reducer {
                     ));
 
                 }
+
             }
+
         }
 
         if !policy_asset_owners.is_empty() {
@@ -202,7 +187,10 @@ impl Reducer {
         for (policy_id, policy_assets) in mint.iter() {
             for (policy_asset, mint_quantity) in policy_assets.iter() {
                 if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), policy_asset.to_string().as_str()]) {
-                    *policy_asset_supply.entry(policy_id.to_string()).or_insert(HashMap::new()).entry(fingerprint.to_string()).or_insert(0) += mint_quantity
+                    *policy_asset_supply.entry(policy_id.to_string())
+                        .or_insert(HashMap::new())
+                        .entry(fingerprint.to_string())
+                        .or_insert(0) += mint_quantity
                 }
 
             }
@@ -233,7 +221,7 @@ impl Reducer {
         assets: &Vec<Asset>,
         spending: bool,
         slot: u64,
-    ) {
+    ) -> bool {
         let adjusted_lovelace = match spending {
             true => -(lovelace as i64),
             false => lovelace as i64
@@ -256,7 +244,7 @@ impl Reducer {
         );
 
         output.send(policy_assets_list.into());
-
+        true
     }
 
     fn process_received(
