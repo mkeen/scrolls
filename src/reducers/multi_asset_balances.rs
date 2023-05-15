@@ -12,7 +12,6 @@ use pallas::ledger::addresses::{Address, StakeAddress};
 use std::collections::HashMap;
 use std::str::from_utf8;
 use gasket::messaging;
-use log::{debug, error};
 use pallas::ledger::primitives::alonzo::Mint;
 use pallas::ledger::primitives::babbage::DatumOption::Hash;
 use crate::model::{CRDTCommand, Delta};
@@ -90,11 +89,14 @@ impl Reducer {
         if !fingerprint_tallies.is_empty() {
             for (soa, quantity_map) in fingerprint_tallies.clone() {
                 for (fingerprint, quantity) in quantity_map {
-                    messages.push(model::CRDTCommand::HashCounter(
-                        format!("{}.{}", prefix, soa),
-                        fingerprint.to_owned(),
-                        quantity
-                    ));
+                    if !fingerprint.is_empty() {
+                        messages.push(model::CRDTCommand::HashCounter(
+                            format!("{}.{}", prefix, soa),
+                            fingerprint.to_owned(),
+                            quantity
+                        ));
+
+                    }
 
                 }
 
@@ -106,17 +108,20 @@ impl Reducer {
             for (policy_id, asset_to_owner) in policy_asset_owners {
                 for (fingerprint, soas) in asset_to_owner {
                     for (soa, quantity) in soas {
-                        messages.push(model::CRDTCommand::SortedSetAdd(
-                            format!("{}.{}.assets", prefix, policy_id),
-                            fingerprint.clone(),
-                            *quantity as Delta,
-                        ));
+                        if !soa.is_empty() {
+                            messages.push(model::CRDTCommand::SortedSetAdd(
+                                format!("{}.{}.assets", prefix, policy_id),
+                                fingerprint.clone(),
+                                *quantity as Delta,
+                            ));
 
-                        messages.push(model::CRDTCommand::HashCounter(
-                            format!("{}.{}.{}", prefix, policy_id, fingerprint),
-                            soa.clone(),
-                            *quantity as Delta,
-                        ));
+                            messages.push(model::CRDTCommand::HashCounter(
+                                format!("{}.{}.{}", prefix, policy_id, fingerprint),
+                                soa.clone(),
+                                *quantity as Delta,
+                            ));
+
+                        }
 
                     }
 
@@ -236,11 +241,7 @@ impl Reducer {
         );
 
         for message in self.reconcile_asset_movement(&fingerprint_tallies, &policy_asset_owners) {
-            match output.send(message.into()) {
-                Ok(_) => {},
-                Err(e) => error!("{}", e)
-            }
-
+            output.send(message.clone_into());
         }
 
         let policy_assets_list = model::CRDTCommand::AnyWriteWins(
@@ -288,7 +289,7 @@ impl Reducer {
                 &spent_output.non_ada_assets(),
                 true,
                 slot,
-            )?;
+            );
 
         }
 
