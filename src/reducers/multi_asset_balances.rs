@@ -211,7 +211,7 @@ impl Reducer {
                     quantity as Delta,
                 );
 
-                output.send(policy_assets_list.into())?;
+                output.send(gasket::messaging::Message::from(policy_assets_list));
             }
 
         }
@@ -241,7 +241,7 @@ impl Reducer {
         );
 
         for message in self.reconcile_asset_movement(&fingerprint_tallies, &policy_asset_owners) {
-            output.send(message.clone_into());
+            output.send(gasket::messaging::Message::from(message));
         }
 
         let policy_assets_list = model::CRDTCommand::AnyWriteWins(
@@ -249,7 +249,7 @@ impl Reducer {
             self.time.slot_to_wallclock(slot).to_string().into(),
         );
 
-        output.send(policy_assets_list.into())
+        output.send(gasket::messaging::Message::from(policy_assets_list))
     }
 
     fn process_received(
@@ -267,9 +267,8 @@ impl Reducer {
             &meo.non_ada_assets(),
             false,
             slot
-        )?;
+        )
 
-        Ok(())
     }
 
     fn process_spent(
@@ -282,7 +281,7 @@ impl Reducer {
         if let Ok(spent_output) = ctx.find_utxo(&mei.output_ref()) {
             let spent_from_soa = self.stake_or_address_from_address(&spent_output.address().unwrap());
 
-            self.process_asset_movement(
+            return self.process_asset_movement(
                 output,
                 &spent_from_soa,
                 spent_output.lovelace_amount(),
@@ -306,15 +305,15 @@ impl Reducer {
 
         for tx in block.txs() {
             if let Some(mint) = tx.mint().as_alonzo() {
-                self.process_minted_or_burned(output, mint)?;
+                self.process_minted_or_burned(output, mint);
             }
 
             for consumes in tx.consumes().iter() {
-                self.process_spent(output, consumes, ctx, slot)?;
+                self.process_spent(output, consumes, ctx, slot);
             }
 
             for (_, produces) in tx.produces().iter() {
-                self.process_received(output, produces, slot)?;
+                self.process_received(output, produces, slot);
             }
 
         }
