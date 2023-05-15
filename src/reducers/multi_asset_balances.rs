@@ -12,6 +12,7 @@ use pallas::ledger::addresses::{Address, StakeAddress};
 use std::collections::HashMap;
 use std::str::from_utf8;
 use gasket::messaging;
+use log::debug;
 use pallas::ledger::primitives::alonzo::Mint;
 use pallas::ledger::primitives::babbage::DatumOption::Hash;
 use crate::model::{CRDTCommand, Delta};
@@ -221,7 +222,7 @@ impl Reducer {
         assets: &Vec<Asset>,
         spending: bool,
         slot: u64,
-    ) -> bool {
+    ) -> Result<(), gasket::error::Error> {
         let adjusted_lovelace = match spending {
             true => -(lovelace as i64),
             false => lovelace as i64
@@ -235,7 +236,11 @@ impl Reducer {
         );
 
         for message in self.reconcile_asset_movement(&fingerprint_tallies, &policy_asset_owners) {
-            output.send(message.into());
+            match output.send(message.into()) {
+                Ok(_) => {},
+                Err(e) => debug!("{}", e)
+            }
+
         }
 
         let policy_assets_list = model::CRDTCommand::AnyWriteWins(
@@ -243,8 +248,7 @@ impl Reducer {
             self.time.slot_to_wallclock(slot).to_string().into(),
         );
 
-        output.send(policy_assets_list.into());
-        true
+        output.send(policy_assets_list.into())
     }
 
     fn process_received(
@@ -262,7 +266,7 @@ impl Reducer {
             &meo.non_ada_assets(),
             false,
             slot
-        );
+        )?;
 
         Ok(())
     }
@@ -284,7 +288,7 @@ impl Reducer {
                 &spent_output.non_ada_assets(),
                 true,
                 slot,
-            );
+            )?;
 
         }
 
