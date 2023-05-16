@@ -4,6 +4,7 @@ use gasket::{
     error::AsWorkError,
     runtime::{spawn_stage, WorkOutcome},
 };
+use log::error;
 
 use redis::{Commands, ToRedisArgs};
 use serde::Deserialize;
@@ -130,9 +131,11 @@ impl gasket::runtime::Worker for Worker {
     fn work(&mut self) -> gasket::runtime::WorkResult {
         let msg = self.input.recv_or_idle()?;
 
+
         match msg.payload {
             model::CRDTCommand::BlockStarting(_) => {
                 // start redis transaction
+                error!("calling start");
                 redis::cmd("MULTI")
                     .query(self.connection.as_mut().unwrap())
                     .or_restart()?;
@@ -271,7 +274,7 @@ impl gasket::runtime::Worker for Worker {
             }
             model::CRDTCommand::BlockFinished(point) => {
                 let cursor_str = crosscut::PointArg::from(point).to_string();
-
+                error!("calling stop");
                 self.connection
                     .as_mut()
                     .unwrap()
