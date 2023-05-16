@@ -135,7 +135,6 @@ impl gasket::runtime::Worker for Worker {
         match msg.payload {
             model::CRDTCommand::BlockStarting(_) => {
                 // start redis transaction
-                error!("calling start");
                 redis::cmd("MULTI")
                     .query(self.connection.as_mut().unwrap())
                     .or_restart()?;
@@ -274,7 +273,6 @@ impl gasket::runtime::Worker for Worker {
             }
             model::CRDTCommand::BlockFinished(point) => {
                 let cursor_str = crosscut::PointArg::from(point).to_string();
-                error!("calling stop {}", cursor_str);
                 self.connection
                     .as_mut()
                     .unwrap()
