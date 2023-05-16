@@ -218,17 +218,20 @@ impl Reducer {
                 for (fingerprint, soas) in asset_to_owner {
                     for (soa, quantity) in soas {
                         if !soa.is_empty() {
-                            output.send(gasket::messaging::Message::from(model::CRDTCommand::SortedSetAdd(
-                                format!("{}.{}.assets", prefix, policy_id),
-                                fingerprint.clone(),
-                                quantity as Delta,
-                            )));
+                            if quantity != 0 {
+                                output.send(gasket::messaging::Message::from(model::CRDTCommand::SortedSetAdd(
+                                    format!("{}.{}.assets", prefix, policy_id),
+                                    fingerprint.clone(),
+                                    quantity as Delta,
+                                )));
 
-                            output.send(gasket::messaging::Message::from(model::CRDTCommand::HashCounter(
-                                format!("{}.owned.{}", prefix, fingerprint),
-                                soa.clone(),
-                                quantity as Delta,
-                            )));
+                                output.send(gasket::messaging::Message::from(model::CRDTCommand::HashCounter(
+                                    format!("{}.owned.{}", prefix, fingerprint),
+                                    soa.clone(),
+                                    quantity as Delta,
+                                )));
+
+                            }
 
                         }
 
