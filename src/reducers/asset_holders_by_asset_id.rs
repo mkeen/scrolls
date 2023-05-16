@@ -99,8 +99,6 @@ impl Reducer {
             error!("Could not find utxo");
         }
 
-
-
         Ok(())
     }
 
