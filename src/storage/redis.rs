@@ -274,7 +274,7 @@ impl gasket::runtime::Worker for Worker {
             }
             model::CRDTCommand::BlockFinished(point) => {
                 let cursor_str = crosscut::PointArg::from(point).to_string();
-                error!("calling stop {}", point);
+                error!("calling stop {}", cursor_str);
                 self.connection
                     .as_mut()
                     .unwrap()
