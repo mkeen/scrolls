@@ -67,32 +67,36 @@ impl Reducer {
         epoch_no: u64,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        let utxo = ctx.find_utxo(input).apply_policy(&self.policy).or_panic()?;
-
-        let utxo = match utxo {
-            Some(x) => x,
-            None => return Ok(()),
-        };
-
-        let address = utxo.address().map(|addr| addr.to_string()).or_panic()?;
-
-        for asset in utxo.assets() {
-            match asset {
-                Asset::NativeAsset(policy_id, _, quantity) => {
-                    if self.is_policy_id_accepted(&policy_id) {
-                        let subject = asset.subject();
-                        let key = self.config_key(subject, epoch_no);
-                        let delta = quantity as i64 * (-1);
-
-                        let crdt =
-                            model::CRDTCommand::SortedSetRemove(key, address.to_string(), delta);
-
-                        output.send(gasket::messaging::Message::from(crdt))?;
-                    }
-                }
-                _ => (),
+        if let Ok(utxo) = ctx.find_utxo(input).apply_policy(&self.policy) { // I was assuming utxo would be found and this would not error
+            let utxo = match utxo {
+                Some(x) => x,
+                None => return Ok(()),
             };
+
+            let address = utxo.address().map(|addr| addr.to_string()).or_panic()?;
+
+            for asset in utxo.assets() {
+                match asset {
+                    Asset::NativeAsset(policy_id, _, quantity) => {
+                        if self.is_policy_id_accepted(&policy_id) {
+                            let subject = asset.subject();
+                            let key = self.config_key(subject, epoch_no);
+                            let delta = quantity as i64 * (-1);
+
+                            let crdt =
+                                model::CRDTCommand::SortedSetRemove(key, address.to_string(), delta);
+
+                            output.send(gasket::messaging::Message::from(crdt))?;
+                        }
+                    }
+                    _ => (),
+                };
+
+            }
+
         }
+
+
 
         Ok(())
     }
