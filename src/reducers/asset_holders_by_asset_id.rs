@@ -86,7 +86,7 @@ impl Reducer {
                                 let crdt =
                                     model::CRDTCommand::SortedSetRemove(key, address.to_string(), delta);
 
-                                output.send(gasket::messaging::Message::from(crdt))?;
+                                output.send(gasket::messaging::Message::from(crdt));
                             }
 
                         }
@@ -126,12 +126,13 @@ impl Reducer {
                             let key = self.config_key(subject, epoch_no);
                             let delta = quantity as i64;
 
-                            let crdt =
-                                model::CRDTCommand::SortedSetAdd(key, address.to_string(), delta);
+                            let crdt = model::CRDTCommand::SortedSetAdd(key, address.to_string(), delta);
 
-                            output.send(gasket::messaging::Message::from(crdt))?;
+                            output.send(gasket::messaging::Message::from(crdt));
                         }
+
                     }
+
                     _ => {}
                 };
 
@@ -155,13 +156,15 @@ impl Reducer {
                 let epoch_no = block_epoch(&self.chain, block);
 
                 for consumed in tx.consumes().iter().map(|i| i.output_ref()) {
-                    self.process_consumed_txo(&ctx, &consumed, epoch_no, output)?;
+                    self.process_consumed_txo(&ctx, &consumed, epoch_no, output);
                 }
 
                 for (_, meo) in tx.produces() {
-                    self.process_produced_txo(&meo, epoch_no, output)?;
+                    self.process_produced_txo(&meo, epoch_no, output);
                 }
+
             }
+
         }
 
         Ok(())
