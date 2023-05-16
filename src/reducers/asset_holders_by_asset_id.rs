@@ -7,6 +7,7 @@ use pallas::crypto::hash::Hash;
 
 use crate::crosscut::epochs::block_epoch;
 use std::str::FromStr;
+use log::error;
 
 #[derive(Deserialize, Copy, Clone)]
 pub enum AggrType {
@@ -94,6 +95,8 @@ impl Reducer {
 
             }
 
+        } else {
+            error!("Could not find utxo");
         }
 
 
