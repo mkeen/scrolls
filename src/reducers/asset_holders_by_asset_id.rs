@@ -74,26 +74,33 @@ impl Reducer {
                 None => return Ok(()),
             };
 
-            let address = utxo.address().map(|addr| addr.to_string()).or_panic()?;
+            if let Ok(address) = utxo.address().map(|addr| addr.to_string()) {
+                for asset in utxo.assets() {
+                    match asset {
+                        Asset::NativeAsset(policy_id, _, quantity) => {
+                            if self.is_policy_id_accepted(&policy_id) {
+                                let subject = asset.subject();
+                                let key = self.config_key(subject, epoch_no);
+                                let delta = quantity as i64 * (-1);
 
-            for asset in utxo.assets() {
-                match asset {
-                    Asset::NativeAsset(policy_id, _, quantity) => {
-                        if self.is_policy_id_accepted(&policy_id) {
-                            let subject = asset.subject();
-                            let key = self.config_key(subject, epoch_no);
-                            let delta = quantity as i64 * (-1);
+                                let crdt =
+                                    model::CRDTCommand::SortedSetRemove(key, address.to_string(), delta);
 
-                            let crdt =
-                                model::CRDTCommand::SortedSetRemove(key, address.to_string(), delta);
+                                output.send(gasket::messaging::Message::from(crdt))?;
+                            }
 
-                            output.send(gasket::messaging::Message::from(crdt))?;
                         }
-                    }
-                    _ => (),
-                };
 
+                        _ => (),
+                    };
+
+                }
+
+            } else {
+                error!("Could not decode address!!");
             }
+
+
 
         } else {
             error!("Could not find utxo");
@@ -108,27 +115,30 @@ impl Reducer {
         epoch_no: u64,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        let address = tx_output
+        if let Ok(address) = tx_output
             .address()
-            .map(|addr| addr.to_string())
-            .or_panic()?;
+            .map(|addr| addr.to_string()) {
+            for asset in tx_output.assets() {
+                match asset {
+                    Asset::NativeAsset(policy_id, _, quantity) => {
+                        if self.is_policy_id_accepted(&policy_id) {
+                            let subject = asset.subject();
+                            let key = self.config_key(subject, epoch_no);
+                            let delta = quantity as i64;
 
-        for asset in tx_output.assets() {
-            match asset {
-                Asset::NativeAsset(policy_id, _, quantity) => {
-                    if self.is_policy_id_accepted(&policy_id) {
-                        let subject = asset.subject();
-                        let key = self.config_key(subject, epoch_no);
-                        let delta = quantity as i64;
+                            let crdt =
+                                model::CRDTCommand::SortedSetAdd(key, address.to_string(), delta);
 
-                        let crdt =
-                            model::CRDTCommand::SortedSetAdd(key, address.to_string(), delta);
-
-                        output.send(gasket::messaging::Message::from(crdt))?;
+                            output.send(gasket::messaging::Message::from(crdt))?;
+                        }
                     }
-                }
-                _ => {}
-            };
+                    _ => {}
+                };
+
+            }
+
+        } else {
+            error!("Could not decode address!");
         }
 
         Ok(())
