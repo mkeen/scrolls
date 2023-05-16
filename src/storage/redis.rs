@@ -204,7 +204,7 @@ impl gasket::runtime::Worker for Worker {
                     .as_mut()
                     .unwrap()
                     .zincr(key, value, delta)
-                    .or_restart()?;
+                    .or_dismiss()?;
             }
             model::CRDTCommand::SortedSetRemove(key, value, delta) => {
                 log::debug!(
