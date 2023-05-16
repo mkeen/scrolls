@@ -1,20 +1,18 @@
-use std::panic;
 use pallas::ledger::traverse::{Asset, MultiEraInput, MultiEraOutput, MultiEraTx};
 use pallas::ledger::traverse::{MultiEraBlock};
 use serde::{Deserialize, Serialize};
 
 use crate::{crosscut, model, prelude::*};
 
-use bech32::{ToBase32, Variant, Error};
+use bech32::{ToBase32, Variant};
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
 use pallas::ledger::addresses::{Address, StakeAddress};
 use std::collections::HashMap;
-use std::str::from_utf8;
-use gasket::messaging;
 use pallas::ledger::primitives::alonzo::Mint;
-use pallas::ledger::primitives::babbage::DatumOption::Hash;
-use crate::model::{CRDTCommand, Delta};
+use crate::model::{Delta};
+use std::result::Result;
+use std::sync::Mutex;
 
 #[derive(Serialize, Deserialize)]
 struct MultiAssetSingleAgg {
@@ -46,7 +44,7 @@ pub struct Config {
 
 fn asset_fingerprint(
     data_list: [&str; 2],
-) -> Result<String, Error> {
+) -> Result<String, bech32::Error> {
     let combined_parts = data_list.join("");
     let raw = hex::decode(combined_parts).unwrap();
     let mut hasher = Blake2bVar::new(20).unwrap();
@@ -76,62 +74,6 @@ impl Reducer {
             Address::Stake(stake) => stake.to_bech32().unwrap_or(address.to_string()),
         }
 
-    }
-
-    fn reconcile_asset_movement(
-        &self,
-        mut fingerprint_tallies: &HashMap<String, HashMap<String, i64>>,
-        mut policy_asset_owners: &HashMap<String, HashMap<String, Vec<(String, i64)>>>
-    ) -> Vec<CRDTCommand> {
-        let mut messages: Vec<CRDTCommand> = vec![];
-        let prefix = self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string());
-
-        if !fingerprint_tallies.is_empty() {
-            for (soa, quantity_map) in fingerprint_tallies.clone() {
-                for (fingerprint, quantity) in quantity_map {
-                    if !fingerprint.is_empty() {
-                        messages.push(model::CRDTCommand::HashCounter(
-                            format!("{}.{}", prefix, soa),
-                            fingerprint.to_owned(),
-                            quantity
-                        ));
-
-                    }
-
-                }
-
-            }
-
-        }
-
-        if !policy_asset_owners.is_empty() {
-            for (policy_id, asset_to_owner) in policy_asset_owners {
-                for (fingerprint, soas) in asset_to_owner {
-                    for (soa, quantity) in soas {
-                        if !soa.is_empty() {
-                            messages.push(model::CRDTCommand::SortedSetAdd(
-                                format!("{}.{}.assets", prefix, policy_id),
-                                fingerprint.clone(),
-                                *quantity as Delta,
-                            ));
-
-                            messages.push(model::CRDTCommand::HashCounter(
-                                format!("{}.{}.{}", prefix, policy_id, fingerprint),
-                                soa.clone(),
-                                *quantity as Delta,
-                            ));
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-        }
-
-        messages
     }
 
     fn calculate_address_asset_balance_offsets(
@@ -240,16 +182,65 @@ impl Reducer {
             spending
         );
 
-        for message in self.reconcile_asset_movement(&fingerprint_tallies, &policy_asset_owners) {
-            output.send(gasket::messaging::Message::from(message));
+        let prefix = self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string());
+
+        if !fingerprint_tallies.is_empty() {
+            for (soa, quantity_map) in fingerprint_tallies.clone() {
+                for (fingerprint, quantity) in quantity_map {
+                    if !fingerprint.is_empty() {
+                        output.send(
+                            gasket::messaging::Message::from(
+                                model::CRDTCommand::HashCounter(
+                                    format!("{}.{}", prefix, soa),
+                                    fingerprint.to_owned(),
+                                    quantity
+                                )
+
+                            )
+
+                        );
+
+                    }
+
+                }
+
+                output.send(gasket::messaging::Message::from(model::CRDTCommand::AnyWriteWins(
+                    format!("{}.latest.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), soa),
+                    self.time.slot_to_wallclock(slot).to_string().into(),
+                )));
+
+            }
+
         }
 
-        let policy_assets_list = model::CRDTCommand::AnyWriteWins(
-            format!("{}.last-activity.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), soa),
-            self.time.slot_to_wallclock(slot).to_string().into(),
-        );
+        if !policy_asset_owners.is_empty() {
+            for (policy_id, asset_to_owner) in policy_asset_owners {
+                for (fingerprint, soas) in asset_to_owner {
+                    for (soa, quantity) in soas {
+                        if !soa.is_empty() {
+                            output.send(gasket::messaging::Message::from(model::CRDTCommand::SortedSetAdd(
+                                format!("{}.{}.assets", prefix, policy_id),
+                                fingerprint.clone(),
+                                quantity as Delta,
+                            )));
 
-        output.send(gasket::messaging::Message::from(policy_assets_list))
+                            output.send(gasket::messaging::Message::from(model::CRDTCommand::HashCounter(
+                                format!("{}.owned.{}", prefix, fingerprint),
+                                soa.clone(),
+                                quantity as Delta,
+                            )));
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        Ok(())
     }
 
     fn process_received(
@@ -304,16 +295,16 @@ impl Reducer {
         let slot = block.slot();
 
         for tx in block.txs() {
-            if let Some(mint) = tx.mint().as_alonzo() {
-                self.process_minted_or_burned(output, mint);
-            }
-
             for consumes in tx.consumes().iter() {
                 self.process_spent(output, consumes, ctx, slot);
             }
 
             for (_, produces) in tx.produces().iter() {
                 self.process_received(output, produces, slot);
+            }
+
+            if let Some(mint) = tx.mint().as_alonzo() {
+                self.process_minted_or_burned(output, mint);
             }
 
         }
