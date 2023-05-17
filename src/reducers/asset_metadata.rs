@@ -126,7 +126,7 @@ impl Reducer {
 
     }
 
-    fn get_wrapped_metadata_fragment(&self, asset_name: String, policy_id: String, asset_metadata: &KeyValuePairs<Metadatum, Metadatum>) -> Metadata {
+    fn get_wrapped_metadata_fragment(&self, cip: u64, asset_name: String, policy_id: String, asset_metadata: &KeyValuePairs<Metadatum, Metadatum>) -> Metadata {
         let asset_map = KeyValuePairs::from(
             vec![(Metadatum::Text(asset_name), Metadatum::Map(asset_metadata.clone())); 1]
         );
@@ -136,7 +136,7 @@ impl Reducer {
         );
 
         let meta_wrapper_721 = vec![(
-            MetadatumLabel::from(CIP25_META),
+            MetadatumLabel::from(cip),
             Metadatum::Map(policy_map.clone())
         )];
 
@@ -171,7 +171,7 @@ impl Reducer {
             if let Some((_, Metadatum::Map(asset_metadata))) = filtered_policy_assets {
                 if let Ok(fingerprint_str) = self.asset_fingerprint([&policy_id_str.clone(), hex::encode(&asset_name_str).as_str()]) {
                     let timestamp = self.time.slot_to_wallclock(slot_no);
-                    let metadata_final = self.get_wrapped_metadata_fragment(asset_name_str.clone(), policy_id_str.clone(), asset_metadata);
+                    let metadata_final = self.get_wrapped_metadata_fragment(cip, asset_name_str.clone(), policy_id_str.clone(), asset_metadata);
 
                     let meta_payload = match projection {
                         Projection::Json => {
