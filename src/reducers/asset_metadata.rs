@@ -203,10 +203,10 @@ impl Reducer {
 
                                         if !meta_payload.is_empty() {
                                             if should_keep_historical_metadata {
-                                                minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::SortedSetAdd(
+                                                minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::LastWriteWins(
                                                     format!("{}.{}", prefix, fingerprint_str.clone()),
-                                                    meta_payload.clone(),
-                                                    timestamp as Delta,
+                                                    meta_payload.clone().into(),
+                                                    timestamp,
                                                 ));
 
                                             } else {
