@@ -186,11 +186,13 @@ impl gasket::runtime::Worker for Worker {
             model::CRDTCommand::LastWriteWins(key, value, ts) => {
                 log::debug!("last write for [{}], slot [{}]", key, ts);
 
-                self.connection
-                    .as_mut()
-                    .unwrap()
-                    .req_command(redis::Cmd::new().arg("ZADD").arg(key).arg("CH").arg(ts).arg(value))
-                    .or_restart();
+                redis::cmd("ZADD")
+                    .arg(key)
+                    .arg("CH")
+                    .arg(ts)
+                    .arg(value)
+                    .query(self.connection.as_mut().unwrap())
+                    .or_restart()?;
             }
             model::CRDTCommand::SortedSetAdd(key, value, delta) => {
                 log::debug!(
