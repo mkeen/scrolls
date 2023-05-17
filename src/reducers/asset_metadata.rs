@@ -240,30 +240,19 @@ impl Reducer {
 
                     if let Ok(asset_name_str) = String::from_utf8(asset_name.to_vec()) {
                         if !policy_id_str.is_empty() {
-                            let nft_metadata = tx.metadata().find(MetadatumLabel::from(CIP25_META_NFT));
-                            let token_metadata = tx.metadata().find(MetadatumLabel::from(CIP25_META_TOKEN));
+                            let metadata = tx.metadata();
+                            for supported_metadata_cip in vec![CIP25_META_NFT, CIP25_META_TOKEN] {
+                                if let Some(policy_map) = metadata.find(MetadatumLabel::from(supported_metadata_cip)) {
+                                    self.extract_any_metadata(
+                                        supported_metadata_cip,
+                                        &mut minted_assets_unique,
+                                        policy_map,
+                                        policy_id_str.to_owned(),
+                                        asset_name_str.to_owned(),
+                                        block.slot().to_owned(),
+                                    );
 
-                            if let Some(policy_map) = nft_metadata {
-                                self.extract_any_metadata(
-                                    CIP25_META_NFT,
-                                    &mut minted_assets_unique,
-                                    policy_map,
-                                    policy_id_str.to_owned(),
-                                    asset_name_str.to_owned(),
-                                    block.slot().to_owned(),
-                                );
-
-                            }
-
-                            if let Some(policy_map) = token_metadata {
-                                self.extract_any_metadata(
-                                    CIP25_META_TOKEN,
-                                    &mut minted_assets_unique,
-                                    policy_map,
-                                    policy_id_str.to_owned(),
-                                    asset_name_str.to_owned(),
-                                    block.slot().to_owned(),
-                                );
+                                }
 
                             }
 
