@@ -293,7 +293,7 @@ impl Reducer {
             // Make sure the TX is worth processing for the use-case (metadata extraction). It should have minted at least one asset with the CIP25_META key present in metadata.
             // Currently this will send thru a TX that is just a burn with no mint, but it will be handled in the reducer.
             // Todo: could be cleaner using a filter
-            if tx.mint().len() > 0 && tx.metadata().as_alonzo().iter().any(|meta| meta.iter().any(|(key, _)| *key == CIP25_META)) {
+            if tx.mint().len() > 0 && tx.metadata().as_alonzo().iter().any(|meta| meta.iter().any(|(key, _)| *key == CIP25_META_TOKEN || *key == CIP25_META_NFT)) {
                 self.send(block, tx, output)?;
             }
 
