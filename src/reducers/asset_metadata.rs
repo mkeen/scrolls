@@ -45,7 +45,8 @@ pub struct Reducer {
     time: crosscut::time::NaiveProvider,
 }
 
-const CIP25_META: u64 = 721;
+const CIP25_META_NFT: u64 = 721;
+const CIP25_META_TOKEN: u64 = 20;
 
 fn kv_pairs_to_hashmap(kv_pairs: &KeyValuePairs<Metadatum, Metadatum>
 ) -> serde_json::Map<String, Value> {
@@ -142,7 +143,7 @@ impl Reducer {
         Metadata::from(meta_wrapper_721)
     }
 
-    fn get_metadata_fragment(&self, asset_name: String, policy_id: String, asset_metadata: &KeyValuePairs<Metadatum, Metadatum>) -> String {
+    fn get_metadata_fragment(&self, asset_name: String, policy_id: String, asset_metadata: &KeyValuePairs<Metadatum, Metadatum>, cip: u64) -> String {
         let mut std_wrap_map = serde_json::Map::new();
         let mut policy_wrap_map = serde_json::Map::new();
         let mut asset_wrap_map = serde_json::Map::new();
@@ -150,9 +151,73 @@ impl Reducer {
 
         asset_wrap_map.insert(asset_name, Value::Object(asset_map));
         policy_wrap_map.insert(policy_id, Value::Object(asset_wrap_map));
-        std_wrap_map.insert(CIP25_META.to_string(), Value::Object(policy_wrap_map));
+        std_wrap_map.insert(cip.to_string(), Value::Object(policy_wrap_map));
 
         serde_json::to_string(&std_wrap_map).unwrap()
+    }
+
+    fn extract_any_metadata(&self, cip: u64, minted_assets_unique: &mut HashMap<String, model::CRDTCommand>, policy_map: &Metadatum, policy_id_str: String, asset_name_str: String, slot_no: u64) {
+        let prefix = self.config.key_prefix.as_deref().unwrap_or("asset-metadata");
+        let projection = self.config.projection.unwrap_or_default();
+        let should_keep_asset_index = self.config.policy_asset_index.unwrap_or(false);
+        let should_keep_historical_metadata = self.config.historical_metadata.unwrap_or(false);
+
+        if let Some(policy_assets) = self.find_metadata_policy_assets(&policy_map, &policy_id_str) {
+            let filtered_policy_assets = policy_assets.iter().find(|(l, _)| {
+                let asset_label = self.get_asset_label(l.clone()).unwrap();
+                asset_label.as_str() == asset_name_str
+            });
+
+            if let Some((_, Metadatum::Map(asset_metadata))) = filtered_policy_assets {
+                if let Ok(fingerprint_str) = self.asset_fingerprint([&policy_id_str.clone(), hex::encode(&asset_name_str).as_str()]) {
+                    let timestamp = self.time.slot_to_wallclock(slot_no);
+                    let metadata_final = self.get_wrapped_metadata_fragment(asset_name_str.clone(), policy_id_str.clone(), asset_metadata);
+
+                    let meta_payload = match projection {
+                        Projection::Json => {
+                            self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_metadata, cip)
+                        },
+
+                        Projection::Cbor => {
+                            let cbor_enc = metadata_final.encode_fragment().unwrap_or(vec![]);
+                            String::from_utf8(cbor_enc).unwrap_or("".to_string())
+                        },
+
+                    };
+
+                    if !meta_payload.is_empty() {
+                        if should_keep_historical_metadata {
+                            minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::LastWriteWins(
+                                format!("{}.{}", prefix, fingerprint_str.clone()),
+                                meta_payload.clone().into(),
+                                timestamp,
+                            ));
+
+                        } else {
+                            minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::AnyWriteWins(
+                                format!("{}.{}", prefix, fingerprint_str.clone()),
+                                model::Value::String(meta_payload.clone()),
+                            ));
+
+                        };
+
+                        if should_keep_asset_index {
+                            minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::LastWriteWins(
+                                format!("{}.{}", prefix, policy_id_str),
+                                fingerprint_str.clone().into(),
+                                timestamp,
+                            ));
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+
     }
 
     fn send(
@@ -161,10 +226,7 @@ impl Reducer {
         tx: &MultiEraTx,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        let prefix = self.config.key_prefix.as_deref().unwrap_or("asset-metadata");
-        let projection = self.config.projection.unwrap_or_default();
-        let should_keep_asset_index = self.config.policy_asset_index.unwrap_or(false);
-        let should_keep_historical_metadata = self.config.historical_metadata.unwrap_or(false);
+
 
         if let Some(safe_mint) = tx.mint().as_alonzo() {
             let mut minted_assets_unique: HashMap<String, model::CRDTCommand> = HashMap::new();
@@ -177,60 +239,31 @@ impl Reducer {
                     }
 
                     if let Ok(asset_name_str) = String::from_utf8(asset_name.to_vec()) {
-                        if let Some(policy_map) = tx.metadata().find(MetadatumLabel::from(CIP25_META)) {
-                            if let Some(policy_assets) = self.find_metadata_policy_assets(&policy_map, &policy_id_str) {
-                                let filtered_policy_assets = policy_assets.iter().find(|(l, _)| {
-                                    let asset_label = self.get_asset_label(l.clone()).unwrap();
-                                    asset_label.as_str() == asset_name_str
-                                });
+                        if !policy_id_str.is_empty() {
+                            let nft_metadata = tx.metadata().find(MetadatumLabel::from(CIP25_META_NFT));
+                            let token_metadata = tx.metadata().find(MetadatumLabel::from(CIP25_META_TOKEN));
 
-                                if let Some((_, Metadatum::Map(asset_metadata))) = filtered_policy_assets {
-                                    if let Ok(fingerprint_str) = self.asset_fingerprint([&policy_id_str.clone(), hex::encode(&asset_name_str).as_str()]) {
-                                        let timestamp = self.time.slot_to_wallclock(block.slot().to_owned());
-                                        let metadata_final = self.get_wrapped_metadata_fragment(asset_name_str.clone(), policy_id_str.clone(), asset_metadata);
+                            if let Some(policy_map) = nft_metadata {
+                                self.extract_any_metadata(
+                                    CIP25_META_NFT,
+                                    &mut minted_assets_unique,
+                                    policy_map,
+                                    policy_id_str.to_owned(),
+                                    asset_name_str.to_owned(),
+                                    block.slot().to_owned(),
+                                );
 
-                                        let meta_payload = match projection {
-                                            Projection::Json => {
-                                                self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_metadata)
-                                            },
+                            }
 
-                                            Projection::Cbor => {
-                                                let cbor_enc = metadata_final.encode_fragment().unwrap_or(vec![]);
-                                                String::from_utf8(cbor_enc).unwrap_or("".to_string())
-                                            },
-
-                                        };
-
-                                        if !meta_payload.is_empty() {
-                                            if should_keep_historical_metadata {
-                                                minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::LastWriteWins(
-                                                    format!("{}.{}", prefix, fingerprint_str.clone()),
-                                                    meta_payload.clone().into(),
-                                                    timestamp,
-                                                ));
-
-                                            } else {
-                                                minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::AnyWriteWins(
-                                                    format!("{}.{}", prefix, fingerprint_str.clone()),
-                                                    model::Value::String(meta_payload.clone()),
-                                                ));
-
-                                            };
-
-                                            if should_keep_asset_index {
-                                                minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::LastWriteWins(
-                                                    format!("{}.{}", prefix, policy_id_str),
-                                                    fingerprint_str.clone().into(),
-                                                    timestamp,
-                                                ));
-
-                                            }
-
-                                        }
-
-                                    }
-
-                                }
+                            if let Some(policy_map) = token_metadata {
+                                self.extract_any_metadata(
+                                    CIP25_META_TOKEN,
+                                    &mut minted_assets_unique,
+                                    policy_map,
+                                    policy_id_str.to_owned(),
+                                    asset_name_str.to_owned(),
+                                    block.slot().to_owned(),
+                                );
 
                             }
 
