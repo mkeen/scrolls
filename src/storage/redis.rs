@@ -7,7 +7,7 @@ use gasket::{
 };
 use log::error;
 
-use redis::{Commands, ToRedisArgs};
+use redis::{Commands, ConnectionLike, ToRedisArgs};
 use serde::Deserialize;
 
 use crate::{bootstrap, crosscut, model};
@@ -189,8 +189,8 @@ impl gasket::runtime::Worker for Worker {
                 self.connection
                     .as_mut()
                     .unwrap()
-                    .zadd(key, value, ts)
-                    .or_restart()?;
+                    .req_command(redis::Cmd::new().arg("ZADD").arg(key).arg("CH").arg(ts).arg(value))
+                    .or_restart();
             }
             model::CRDTCommand::SortedSetAdd(key, value, delta) => {
                 log::debug!(
