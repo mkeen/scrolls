@@ -264,7 +264,7 @@ impl gasket::runtime::Worker for Worker {
                     .as_mut()
                     .unwrap()
                     .hincr(key, member, delta)
-                    .or_restart()?;
+                    .or_dismiss()?;
             }
             model::CRDTCommand::HashUnsetKey(key, member) => {
                 log::debug!("deleting hash key {} member {}", key, member);

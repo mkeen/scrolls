@@ -93,7 +93,7 @@ impl Reducer {
 
                 if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
                     if !fingerprint.is_empty() {
-                        let adjusted_quality: i64 = match spending {
+                        let adjusted_quantity: i64 = match spending {
                             true => -(quantity as i64),
                             false => quantity as i64
                         };
@@ -101,13 +101,13 @@ impl Reducer {
                         *fingerprint_tallies.entry(address.clone())
                             .or_insert(HashMap::new())
                             .entry(fingerprint.clone())
-                            .or_insert(0_i64) += adjusted_quality;
+                            .or_insert(0_i64) += adjusted_quantity;
 
                         policy_asset_owners.entry(policy_id.clone().to_string())
                             .or_insert(HashMap::new())
                             .entry(fingerprint)
                             .or_insert(Vec::new())
-                            .push((address.clone(), adjusted_quality));
+                            .push((address.clone(), adjusted_quantity));
                     }
 
                 }
