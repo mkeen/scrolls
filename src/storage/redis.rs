@@ -136,7 +136,7 @@ impl gasket::runtime::Worker for Worker {
         match msg.payload {
             model::CRDTCommand::BlockStarting(_) => {
                 // start redis transaction
-                warn!("block start");
+                // warn!("block start");
                 // redis::cmd("MULTI")
                 //     .query(self.connection.as_mut().unwrap())
                 //     .or_restart()?;
@@ -289,7 +289,7 @@ impl gasket::runtime::Worker for Worker {
                     &cursor_str
                 );
 
-                warn!("about to exec");
+                // warn!("about to exec");
 
                 // end redis transaction
                 // redis::cmd("EXEC")
