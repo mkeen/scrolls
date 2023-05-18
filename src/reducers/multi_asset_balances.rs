@@ -9,10 +9,8 @@ use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
 use pallas::ledger::addresses::{Address, StakeAddress};
 use std::collections::HashMap;
-use pallas::ledger::primitives::alonzo::Mint;
 use crate::model::{Delta};
 use std::result::Result;
-use std::sync::Mutex;
 
 #[derive(Serialize, Deserialize)]
 struct MultiAssetSingleAgg {
@@ -82,7 +80,10 @@ impl Reducer {
         lovelace: &i64,
         assets: &Vec<Asset>,
         spending: bool,
-    ) -> (HashMap<String, HashMap<String, i64>>, HashMap<String, HashMap<String, Vec<(String, i64)>>>) {
+    ) -> (
+        HashMap<String, HashMap<String, i64>>,
+        HashMap<String, HashMap<String, Vec<(String, i64)>>>
+    ) {
         let mut fingerprint_tallies: HashMap<String, HashMap<String, i64>> = HashMap::new();
         let mut policy_asset_owners: HashMap<String, HashMap<String, Vec<(String, i64)>>> = HashMap::new();
 

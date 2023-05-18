@@ -155,11 +155,19 @@ impl Reducer {
         serde_json::to_string(&std_wrap_map).unwrap()
     }
 
-    fn extract_token_metadata(&self, cip: u64, minted_assets_unique: &mut HashMap<String, model::CRDTCommand>, policy_map: &Metadatum, policy_id_str: String, asset_name_str: String, slot_no: u64) {
+    fn extract_token_metadata(
+        &self,
+        cip: u64,
+        minted_assets_unique: &mut HashMap<String, model::CRDTCommand>,
+        policy_map: &Metadatum,
+        policy_id_str: String,
+        asset_name_str: String,
+        slot_no: u64
+    ) {
         let prefix = self.config.key_prefix.as_deref().unwrap_or("asset-metadata");
         let projection = self.config.projection.unwrap_or_default();
-        let should_keep_asset_index = self.config.policy_asset_index.unwrap_or(false);
-        let should_keep_historical_metadata = self.config.historical_metadata.unwrap_or(false);
+        let should_keep_asset_index = self.config.policy_asset_index.unwrap_or(true);
+        let should_keep_historical_metadata = self.config.historical_metadata.unwrap_or(true);
 
         if let Some(policy_assets) = self.find_metadata_policy_assets(&policy_map, &policy_id_str) {
             let filtered_policy_assets = policy_assets.iter().find(|(l, _)| {
