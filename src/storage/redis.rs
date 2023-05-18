@@ -136,10 +136,10 @@ impl gasket::runtime::Worker for Worker {
         match msg.payload {
             model::CRDTCommand::BlockStarting(_) => {
                 // start redis transaction
-                // warn!("block start");
-                // redis::cmd("MULTI")
-                //     .query(self.connection.as_mut().unwrap())
-                //     .or_restart()?;
+                warn!("block start");
+                redis::cmd("MULTI")
+                    .query(self.connection.as_mut().unwrap())
+                    .or_restart()?;
             }
             model::CRDTCommand::GrowOnlySetAdd(key, value) => {
                 self.connection
@@ -205,7 +205,7 @@ impl gasket::runtime::Worker for Worker {
                     .as_mut()
                     .unwrap()
                     .zincr(key, value, delta)
-                    .or_dismiss()?;
+                    .or_restart()?;
             }
             model::CRDTCommand::SortedSetRemove(key, value, delta) => {
                 log::debug!(
@@ -244,7 +244,7 @@ impl gasket::runtime::Worker for Worker {
                     .as_mut()
                     .unwrap()
                     .incr(key, value)
-                    .or_dismiss()?;
+                    .or_restart()?;
             }
             model::CRDTCommand::HashSetValue(key, member, value) => {
                 log::debug!("setting hash key {} member {}", key, member);
@@ -289,10 +289,9 @@ impl gasket::runtime::Worker for Worker {
 
                 // warn!("about to exec");
 
-                // end redis transaction
-                // redis::cmd("EXEC")
-                //     .query(self.connection.as_mut().unwrap())
-                //     .or_restart()?;
+                redis::cmd("EXEC")
+                    .query(self.connection.as_mut().unwrap())
+                    .or_restart()?;
             }
         };
 
