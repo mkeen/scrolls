@@ -25,7 +25,7 @@ impl Reducer {
     ) -> Result<(), gasket::error::Error> {
         let epoch_no = block_epoch(&self.chain, block);
 
-        let crdt = model::CRDTCommand::HashSetValue("params".to_string(), format!("{}.{}", key, "epoch_no"), Value::BigInt(epoch_no as i128));
+        let crdt = model::CRDTCommand::HashSetValue(key.into(), "epoch_no".into(), Value::BigInt(epoch_no as i128));
 
         output.send(gasket::messaging::Message::from(crdt))?;
 
@@ -38,7 +38,7 @@ impl Reducer {
         key: &str,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::HashSetValue("params".to_string(), format!("{}.{}", key, "height"), Value::BigInt(block.number() as i128));
+        let crdt = model::CRDTCommand::HashSetValue(key.into(), "height".into(), Value::BigInt(block.number() as i128));
 
         output.send(gasket::messaging::Message::from(crdt))?;
 
@@ -51,7 +51,7 @@ impl Reducer {
         key: &str,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::HashSetValue("params".to_string(), format!("{}.{}", key, "slot_no"), Value::BigInt(block.slot() as i128));
+        let crdt = model::CRDTCommand::HashSetValue(key.into(), "slot_no".into(), Value::BigInt(block.slot() as i128));
 
         output.send(gasket::messaging::Message::from(crdt))?;
 
@@ -64,7 +64,7 @@ impl Reducer {
         key: &str,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::HashSetValue("params".to_string(), format!("{}.{}", key, "block_hash"), Value::String(block.hash().to_string()));
+        let crdt = model::CRDTCommand::HashSetValue(key.into(), "block_hash".into(), Value::String(block.hash().to_string()));
 
         output.send(gasket::messaging::Message::from(crdt))?;
 
@@ -77,7 +77,7 @@ impl Reducer {
         key: &str,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::HashSetValue("params".to_string(), format!("{}.{}", key, "block_era"), Value::String(block.era().to_string()));
+        let crdt = model::CRDTCommand::HashSetValue(key.into(), "block_era".into(), Value::String(block.era().to_string()));
 
         output.send(gasket::messaging::Message::from(crdt))?;
 
@@ -91,11 +91,11 @@ impl Reducer {
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         if !block.is_empty() {
-            let crdt = model::CRDTCommand::HashSetValue("params".to_string(), format!("{}.{}", key, "first_transaction_hash"), Value::String(block.txs().first().unwrap().hash().to_string()));
+            let crdt = model::CRDTCommand::HashSetValue(key.into(), "first_transaction_hash".into(), Value::String(block.txs().first().unwrap().hash().to_string()));
 
             output.send(gasket::messaging::Message::from(crdt))?;
 
-            let crdt = model::CRDTCommand::HashSetValue("params".to_string(), format!("{}.{}", key, "last_transaction_hash"), Value::String(block.txs().last().unwrap().hash().to_string()));
+            let crdt = model::CRDTCommand::HashSetValue(key.into(), "last_transaction_hash".into(), Value::String(block.txs().last().unwrap().hash().to_string()));
 
             output.send(gasket::messaging::Message::from(crdt))?;
         }
@@ -109,7 +109,7 @@ impl Reducer {
         key: &str,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::HashSetValue("params".to_string(), format!("{}.{}", key, "transactions_count"), Value::BigInt(block.tx_count() as i128));
+        let crdt = model::CRDTCommand::HashSetValue(key.into(), "transactions_count".into(), Value::String(block.tx_count().to_string()));
 
         output.send(gasket::messaging::Message::from(crdt))?;
 
