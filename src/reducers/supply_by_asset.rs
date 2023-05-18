@@ -46,7 +46,7 @@ impl Reducer {
             None => format!("{}.{}", "supply_by_asset".to_string(), asset_id),
         };
 
-        let crdt = model::CRDTCommand::PNCounter(key, qty);
+        let crdt = model::CRDTCommand::HashCounter(policy.to_string(), key, qty);
 
         output.send(crdt.into())
     }

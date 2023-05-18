@@ -166,8 +166,8 @@ impl Reducer {
     ) {
         let prefix = self.config.key_prefix.as_deref().unwrap_or("asset-metadata");
         let projection = self.config.projection.unwrap_or_default();
-        let should_keep_asset_index = self.config.policy_asset_index.unwrap_or(true);
-        let should_keep_historical_metadata = self.config.historical_metadata.unwrap_or(true);
+        let should_keep_asset_index = self.config.policy_asset_index.unwrap_or(false);
+        let should_keep_historical_metadata = self.config.historical_metadata.unwrap_or(false);
 
         if let Some(policy_assets) = self.find_metadata_policy_assets(&policy_map, &policy_id_str) {
             let filtered_policy_assets = policy_assets.iter().find(|(l, _)| {
