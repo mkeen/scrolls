@@ -5,7 +5,7 @@ use gasket::{
     error::AsWorkError,
     runtime::{spawn_stage, WorkOutcome},
 };
-use log::error;
+use log::{error, warn};
 
 use redis::{Commands, ConnectionLike, ToRedisArgs};
 use serde::Deserialize;
@@ -136,6 +136,7 @@ impl gasket::runtime::Worker for Worker {
         match msg.payload {
             model::CRDTCommand::BlockStarting(_) => {
                 // start redis transaction
+                warn!("block start");
                 redis::cmd("MULTI")
                     .query(self.connection.as_mut().unwrap())
                     .or_restart()?;
@@ -287,6 +288,8 @@ impl gasket::runtime::Worker for Worker {
                     &self.config.cursor_key(),
                     &cursor_str
                 );
+
+                warn!("about to exec");
 
                 // end redis transaction
                 redis::cmd("EXEC")

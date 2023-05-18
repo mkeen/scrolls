@@ -1,3 +1,4 @@
+use log::{debug, warn};
 use pallas::ledger::traverse::MultiEraBlock;
 
 use crate::{crosscut, model, prelude::*};
@@ -54,7 +55,10 @@ impl Worker {
             model::CRDTCommand::block_starting(&block),
         ))?;
 
+
+
         for reducer in self.reducers.iter_mut() {
+            warn!("block processing");
             reducer.reduce_block(&block, ctx, &mut self.output)?;
             self.ops_count.inc(1);
         }
