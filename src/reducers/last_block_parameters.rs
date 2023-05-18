@@ -25,7 +25,7 @@ impl Reducer {
     ) -> Result<(), gasket::error::Error> {
         let epoch_no = block_epoch(&self.chain, block);
 
-        let crdt = model::CRDTCommand::HashSetValue(key.into(), "epoch_no".into(), epoch_no.to_string().into());
+        let crdt = model::CRDTCommand::HashSetValue(key.into(), "epoch_no".into(), Value::String(epoch_no.to_string().into()));
 
         output.send(gasket::messaging::Message::from(crdt))?;
 
@@ -38,7 +38,7 @@ impl Reducer {
         key: &str,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::HashSetValue(key.into(), "height".into(), block.number().to_string().into());
+        let crdt = model::CRDTCommand::HashSetValue(key.into(), "height".into(), Value::String(block.number().to_string().into()));
 
         output.send(gasket::messaging::Message::from(crdt))?;
 
@@ -51,7 +51,7 @@ impl Reducer {
         key: &str,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::HashSetValue(key.into(), "slot_no".into(), block.slot().to_string().into());
+        let crdt = model::CRDTCommand::HashSetValue(key.into(), "slot_no".into(), Value::String(block.slot().to_string().into()));
 
         output.send(gasket::messaging::Message::from(crdt))?;
 
