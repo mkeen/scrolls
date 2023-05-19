@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 use gasket::error::AsWorkError;
 use pallas::crypto::hash::Hash;
+use pallas::ledger::primitives::alonzo::PolicyId;
 use pallas::ledger::traverse::Asset;
 use pallas::ledger::traverse::MultiEraBlock;
 use serde::Deserialize;
@@ -31,7 +32,7 @@ impl Reducer {
 
     fn process_asset(
         &mut self,
-        policy: &Hash<28>,
+        policy: &PolicyId,
         asset: &Vec<u8>,
         qty: i64,
         output: &mut super::OutputPort,
