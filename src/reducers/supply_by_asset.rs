@@ -57,7 +57,7 @@ impl Reducer {
         let asset_id = &format!("{}{}", policy, hex::encode(asset));
 
         let key = match &self.config.key_prefix {
-            Some(prefix) => format!("{}.{}", prefix, asset_id),
+            Some(prefix) => prefix.to_string(),
             None => format!("{}.{}", "supply_by_asset".to_string(), asset_id),
         };
 
@@ -70,7 +70,6 @@ impl Reducer {
         }
 
         Ok(())
-
 
     }
 
