@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::str::FromStr;
 
 use gasket::error::AsWorkError;
@@ -46,7 +47,7 @@ impl Reducer {
             None => format!("{}.{}", "supply_by_asset".to_string(), asset_id),
         };
 
-        let crdt = model::CRDTCommand::HashCounter(format!("{}.{}", key, hex::encode(policy.to_string())), asset_id.to_string(), qty);
+        let crdt = model::CRDTCommand::HashCounter(format!("{}.{}", key, policy.hash().to_string()), asset_id.to_string(), qty);
 
         output.send(crdt.into())
     }
