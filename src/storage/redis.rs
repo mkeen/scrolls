@@ -1,5 +1,5 @@
 use std::{str::FromStr, time::Duration};
-use futures::TryFutureExt;
+use futures::{TryFutureExt, TryStreamExt};
 
 use gasket::{
     error::AsWorkError,
@@ -136,7 +136,6 @@ impl gasket::runtime::Worker for Worker {
         match msg.payload {
             model::CRDTCommand::BlockStarting(_) => {
                 // start redis transaction
-                warn!("block start");
                 redis::cmd("MULTI")
                     .query(self.connection.as_mut().unwrap())
                     .or_restart()?;
@@ -256,13 +255,13 @@ impl gasket::runtime::Worker for Worker {
                     .or_restart()?;
             }
             model::CRDTCommand::HashCounter(key, member, delta) => {
-                log::debug!("increasing hash key {} member {} by {}", key, member, delta);
+                log::debug!("increasing hash key {} member {} by {}", key.clone(), member.clone(), delta);
 
                 self.connection
                     .as_mut()
                     .unwrap()
-                    .hincr(key, member, delta)
-                    .or_dismiss()?;
+                    .hincr(key.clone(), member.clone(), delta)
+                    .or_restart()?;
             }
             model::CRDTCommand::HashUnsetKey(key, member) => {
                 log::debug!("deleting hash key {} member {}", key, member);
