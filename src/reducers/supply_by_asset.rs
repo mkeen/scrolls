@@ -1,9 +1,10 @@
-use std::hash::Hash;
 use std::str::FromStr;
+use bech32::{ToBase32, Variant};
+use blake2::digest::{Update, VariableOutput};
+use blake2::Blake2bVar;
 
 use gasket::error::AsWorkError;
 use pallas::crypto::hash::Hash;
-use pallas::ledger::primitives::alonzo::PolicyId;
 use pallas::ledger::traverse::Asset;
 use pallas::ledger::traverse::MultiEraBlock;
 use serde::Deserialize;
@@ -30,9 +31,21 @@ impl Reducer {
         };
     }
 
+    fn asset_fingerprint(&self, data_list: [&str; 2]) -> Result<String, bech32::Error> {
+        let combined_parts = data_list.join("");
+        let raw = hex::decode(combined_parts).unwrap();
+
+        let mut hasher = Blake2bVar::new(20).unwrap();
+        hasher.update(&raw);
+        let mut buf = [0u8; 20];
+        hasher.finalize_variable(&mut buf).unwrap();
+        let base32_combined = buf.to_base32();
+        bech32::encode("asset", base32_combined, Variant::Bech32)
+    }
+
     fn process_asset(
         &mut self,
-        policy: &PolicyId,
+        policy: &Hash<28>,
         asset: &Vec<u8>,
         qty: i64,
         output: &mut super::OutputPort,
@@ -48,9 +61,17 @@ impl Reducer {
             None => format!("{}.{}", "supply_by_asset".to_string(), asset_id),
         };
 
-        let crdt = model::CRDTCommand::HashCounter(format!("{}.{}", key, policy.hash().to_string()), asset_id.to_string(), qty);
+        if let Ok(asset_name_str) = String::from_utf8(asset.to_vec()) {
+            if let Ok(fingerprint_str) = self.asset_fingerprint([hex::encode(policy).as_str(), hex::encode(asset_name_str).as_str()]) {
+                let crdt = model::CRDTCommand::HashCounter(format!("{}.{}", key, hex::encode(policy)), fingerprint_str, qty);
+                output.send(crdt.into())?;
+            }
 
-        output.send(crdt.into())
+        }
+
+        Ok(())
+
+
     }
 
     pub fn reduce_block<'b>(
