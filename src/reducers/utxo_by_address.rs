@@ -1,3 +1,4 @@
+use pallas::ledger::addresses::{Address, StakeAddress};
 use pallas::ledger::traverse::MultiEraOutput;
 use pallas::ledger::traverse::{MultiEraBlock, MultiEraTx, OutputRef};
 use serde::Deserialize;
@@ -16,6 +17,19 @@ pub struct Reducer {
 }
 
 impl Reducer {
+    fn stake_or_address_from_address(&self, address: &Address) -> String {
+        match address {
+            Address::Shelley(s) => match StakeAddress::try_from(s.clone()).ok() {
+                Some(x) => x.to_bech32().unwrap_or(x.to_hex()),
+                _ => address.to_bech32().unwrap_or(address.to_string()),
+            },
+
+            Address::Byron(_) => address.to_bech32().unwrap_or(address.to_string()),
+            Address::Stake(stake) => stake.to_bech32().unwrap_or(address.to_string()),
+        }
+
+    }
+
     fn process_consumed_txo(
         &mut self,
         ctx: &model::BlockContext,
@@ -37,13 +51,19 @@ impl Reducer {
             }
         }
 
-        let crdt = model::CRDTCommand::set_remove(
-            self.config.key_prefix.as_deref(),
-            &address,
-            input.to_string(),
-        );
+        if let Ok(raw_address) = &utxo.address() {
+            let soa = self.stake_or_address_from_address(raw_address);
 
-        output.send(crdt.into())
+            let crdt = model::CRDTCommand::set_remove(
+                self.config.key_prefix.as_deref(),
+                &soa,
+                input.to_string(),
+            );
+
+            output.send(crdt.into());
+        }
+
+        Ok(())
     }
 
     fn process_produced_txo(
@@ -62,13 +82,19 @@ impl Reducer {
             }
         }
 
-        let crdt = model::CRDTCommand::set_add(
-            self.config.key_prefix.as_deref(),
-            &address,
-            format!("{}#{}", tx_hash, output_idx),
-        );
+        if let Ok(raw_address) = &tx_output.address() {
+            let soa = self.stake_or_address_from_address(raw_address);
+            let crdt = model::CRDTCommand::set_add(
+                self.config.key_prefix.as_deref(),
+                &soa,
+                format!("{}#{}", tx_hash, output_idx),
+            );
 
-        output.send(crdt.into())
+            output.send(crdt.into());
+
+        }
+
+        Ok(())
     }
 
     pub fn reduce_block<'b>(

@@ -5,6 +5,7 @@ use blake2::Blake2bVar;
 
 use gasket::error::AsWorkError;
 use pallas::crypto::hash::Hash;
+use pallas::ledger::addresses::{Address, StakeAddress};
 use pallas::ledger::traverse::Asset;
 use pallas::ledger::traverse::MultiEraBlock;
 use serde::Deserialize;
