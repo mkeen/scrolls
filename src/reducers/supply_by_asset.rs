@@ -47,7 +47,7 @@ impl Reducer {
         &mut self,
         policy: &Hash<28>,
         asset: &Vec<u8>,
-        qty: i64,
+        qty: i128,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         if !self.is_policy_id_accepted(&policy) {
@@ -86,7 +86,7 @@ impl Reducer {
             if let Some(mints) = tx.mint().as_alonzo() {
                 for (policy, assets) in mints.iter() {
                     for (name, amount) in assets.iter() {
-                        self.process_asset(policy, name, *amount, output)?;
+                        self.process_asset(policy, name, *amount as i128, output)?;
                     }
                 }
             }
