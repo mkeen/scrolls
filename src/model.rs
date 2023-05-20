@@ -94,7 +94,6 @@ impl EnrichedBlockPayload {
 pub type Set = String;
 pub type Member = String;
 pub type Key = String;
-pub type Delta = i64;
 pub type Timestamp = u64;
 
 #[derive(Clone, Debug)]
@@ -129,16 +128,16 @@ pub enum CRDTCommand {
     BlockStarting(Point),
     SetAdd(Set, Member),
     SetRemove(Set, Member),
-    SortedSetAdd(Set, Member, Delta),
-    SortedSetRemove(Set, Member, Delta),
+    SortedSetAdd(Set, Member, i64),
+    SortedSetRemove(Set, Member, i64),
     TwoPhaseSetAdd(Set, Member),
     TwoPhaseSetRemove(Set, Member),
     GrowOnlySetAdd(Set, Member),
     LastWriteWins(Key, Value, Timestamp),
     AnyWriteWins(Key, Value),
     // TODO make sure Value is a generic not stringly typed
-    PNCounter(Key, Delta),
-    HashCounter(Key, Member, Delta),
+    PNCounter(Key, i128),
+    HashCounter(Key, Member, i128),
     HashSetValue(Key, Member, Value),
     HashUnsetKey(Key, Member),
     BlockFinished(Point),
@@ -258,7 +257,7 @@ impl CRDTCommand {
         prefix: Option<&str>,
         key: &str,
         member: String,
-        delta: i64,
+        delta: i128,
     ) -> CRDTCommand {
         let key = match prefix {
             Some(prefix) => format!("{}.{}", prefix, key.to_string()),

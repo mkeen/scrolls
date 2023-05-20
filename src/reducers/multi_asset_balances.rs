@@ -77,15 +77,15 @@ impl Reducer {
     fn calculate_address_asset_balance_offsets(
         &self,
         address: &String,
-        lovelace: &i64,
+        lovelace: i128,
         assets: &Vec<Asset>,
         spending: bool,
     ) -> (
-        HashMap<String, HashMap<String, i64>>,
-        HashMap<String, HashMap<String, Vec<(String, i64)>>>
+        HashMap<String, HashMap<String, i128>>,
+        HashMap<String, HashMap<String, Vec<(String, i128)>>>
     ) {
-        let mut fingerprint_tallies: HashMap<String, HashMap<String, i64>> = HashMap::new();
-        let mut policy_asset_owners: HashMap<String, HashMap<String, Vec<(String, i64)>>> = HashMap::new();
+        let mut fingerprint_tallies: HashMap<String, HashMap<String, i128>> = HashMap::new();
+        let mut policy_asset_owners: HashMap<String, HashMap<String, Vec<(String, i128)>>> = HashMap::new();
 
         for asset in assets.clone() {
             if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
@@ -93,15 +93,15 @@ impl Reducer {
 
                 if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
                     if !fingerprint.is_empty() {
-                        let adjusted_quantity: i64 = match spending {
-                            true => -(quantity as i64),
-                            false => quantity as i64
+                        let adjusted_quantity: i128 = match spending {
+                            true => -(quantity as i128),
+                            false => quantity as i128
                         };
 
                         *fingerprint_tallies.entry(address.clone())
                             .or_insert(HashMap::new())
                             .entry(fingerprint.clone())
-                            .or_insert(0_i64) += adjusted_quantity;
+                            .or_insert(0_i128) += adjusted_quantity;
 
                         policy_asset_owners.entry(policy_id.clone().to_string())
                             .or_insert(HashMap::new())
@@ -119,7 +119,7 @@ impl Reducer {
         *fingerprint_tallies.entry(address.to_string())
             .or_insert(HashMap::new())
             .entry("lovelace".to_string())
-            .or_insert(0) += *lovelace;
+            .or_insert(0) += lovelace;
 
         (fingerprint_tallies, policy_asset_owners)
     }
@@ -134,13 +134,13 @@ impl Reducer {
         slot: u64,
     ) -> Result<(), gasket::error::Error> {
         let adjusted_lovelace = match spending {
-            true => -(lovelace as i64),
-            false => lovelace as i64
+            true => -(lovelace as i128),
+            false => lovelace as i128
         };
 
         let (fingerprint_tallies, policy_asset_owners) = self.calculate_address_asset_balance_offsets(
             soa,
-            &adjusted_lovelace,
+            adjusted_lovelace,
             assets,
             spending
         );
@@ -150,7 +150,7 @@ impl Reducer {
         if !fingerprint_tallies.is_empty() {
             for (soa, quantity_map) in fingerprint_tallies.clone() {
                 for (fingerprint, quantity) in quantity_map {
-                    if !fingerprint.is_empty() && fingerprint != "asset1s7nlt45cc82upqewvjtgu7g97l7eg483c6wu75" {
+                    if !fingerprint.is_empty() {
                         output.send(
                             gasket::messaging::Message::from(
                                 model::CRDTCommand::HashCounter(
@@ -180,12 +180,12 @@ impl Reducer {
             for (policy_id, asset_to_owner) in policy_asset_owners {
                 for (fingerprint, soas) in asset_to_owner {
                     for (soa, quantity) in soas {
-                        if !soa.is_empty() && fingerprint != "asset1s7nlt45cc82upqewvjtgu7g97l7eg483c6wu75" {
+                        if !soa.is_empty() {
                             if quantity != 0 {
                                 output.send(gasket::messaging::Message::from(model::CRDTCommand::HashCounter(
                                     format!("{}.owned.{}", prefix, fingerprint),
                                     soa.clone(),
-                                    quantity as Delta,
+                                    quantity,
                                 )));
 
                             }

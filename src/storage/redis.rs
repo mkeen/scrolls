@@ -7,7 +7,7 @@ use gasket::{
 };
 use log::{error, warn};
 
-use redis::{Commands, ConnectionLike, ToRedisArgs};
+use redis::{Cmd, Commands, ConnectionLike, ToRedisArgs};
 use serde::Deserialize;
 
 use crate::{bootstrap, crosscut, model};
@@ -236,13 +236,13 @@ impl gasket::runtime::Worker for Worker {
                     .set(key, value)
                     .or_restart()?;
             }
-            model::CRDTCommand::PNCounter(key, value) => {
+            model::CRDTCommand::PNCounter(key, delta) => {
                 log::debug!("increasing counter [{}], by [{}]", key, value);
 
                 self.connection
                     .as_mut()
                     .unwrap()
-                    .incr(key, value)
+                    .incr(key, delta.into())
                     .or_restart()?;
             }
             model::CRDTCommand::HashSetValue(key, member, value) => {
@@ -260,7 +260,12 @@ impl gasket::runtime::Worker for Worker {
                 self.connection
                     .as_mut()
                     .unwrap()
-                    .hincr(key.clone(), member.clone(), delta)
+                    .req_command(&Cmd::new()
+                        .arg("HINCRBYFLOAT")
+                        .arg(key.clone())
+                        .arg(member.clone())
+                        .arg(delta.into())
+                    )
                     .or_restart()?;
             }
             model::CRDTCommand::HashUnsetKey(key, member) => {
