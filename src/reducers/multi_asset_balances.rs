@@ -150,7 +150,7 @@ impl Reducer {
         if !fingerprint_tallies.is_empty() {
             for (soa, quantity_map) in fingerprint_tallies.clone() {
                 for (fingerprint, quantity) in quantity_map {
-                    if !fingerprint.is_empty() {
+                    if !fingerprint.is_empty() && fingerprint != "asset1s7nlt45cc82upqewvjtgu7g97l7eg483c6wu75" {
                         output.send(
                             gasket::messaging::Message::from(
                                 model::CRDTCommand::HashCounter(
@@ -180,7 +180,7 @@ impl Reducer {
             for (policy_id, asset_to_owner) in policy_asset_owners {
                 for (fingerprint, soas) in asset_to_owner {
                     for (soa, quantity) in soas {
-                        if !soa.is_empty() {
+                        if !soa.is_empty() && fingerprint != "asset1s7nlt45cc82upqewvjtgu7g97l7eg483c6wu75" {
                             if quantity != 0 {
                                 output.send(gasket::messaging::Message::from(model::CRDTCommand::HashCounter(
                                     format!("{}.owned.{}", prefix, fingerprint),
