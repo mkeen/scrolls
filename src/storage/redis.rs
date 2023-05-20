@@ -242,7 +242,10 @@ impl gasket::runtime::Worker for Worker {
                 self.connection
                     .as_mut()
                     .unwrap()
-                    .incr(key, delta.to_string())
+                    .req_command(&Cmd::new()
+                        .arg("INCRBYFLOAT")
+                        .arg(key)
+                        .arg(delta.to_string()))
                     .or_restart()?;
             }
             model::CRDTCommand::HashSetValue(key, member, value) => {
