@@ -135,10 +135,10 @@ impl gasket::runtime::Worker for Worker {
 
         match msg.payload {
             model::CRDTCommand::BlockStarting(_) => {
-                // start redis transaction
-                // redis::cmd("MULTI")
-                //     .query(self.connection.as_mut().unwrap())
-                //     .or_restart()?;
+                start redis transaction
+                redis::cmd("MULTI")
+                    .query(self.connection.as_mut().unwrap())
+                    .or_restart()?;
             }
             model::CRDTCommand::GrowOnlySetAdd(key, value) => {
                 self.connection
@@ -291,11 +291,9 @@ impl gasket::runtime::Worker for Worker {
                     &cursor_str
                 );
 
-                // warn!("about to exec");
-
-                // redis::cmd("EXEC")
-                //     .query(self.connection.as_mut().unwrap())
-                //     .or_restart()?;
+                redis::cmd("EXEC")
+                    .query(self.connection.as_mut().unwrap())
+                    .or_restart()?;
             }
         };
 
