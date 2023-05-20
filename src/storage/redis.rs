@@ -204,7 +204,7 @@ impl gasket::runtime::Worker for Worker {
                     .as_mut()
                     .unwrap()
                     .zincr(key, value, delta)
-                    .or_restart()?;
+                    .or_dismiss()?;
             }
             model::CRDTCommand::SortedSetRemove(key, value, delta) => {
                 log::debug!(
@@ -218,7 +218,7 @@ impl gasket::runtime::Worker for Worker {
                     .as_mut()
                     .unwrap()
                     .zincr(&key, value, delta)
-                    .or_restart()?;
+                    .or_dismiss()?;
 
                 // removal of dangling scores  (aka garage collection)
                 self.connection
@@ -243,7 +243,7 @@ impl gasket::runtime::Worker for Worker {
                     .as_mut()
                     .unwrap()
                     .incr(key, value)
-                    .or_restart()?;
+                    .or_dismiss()?;
             }
             model::CRDTCommand::HashSetValue(key, member, value) => {
                 log::debug!("setting hash key {} member {}", key, member);
@@ -261,7 +261,7 @@ impl gasket::runtime::Worker for Worker {
                     .as_mut()
                     .unwrap()
                     .hincr(key.clone(), member.clone(), delta)
-                    .or_restart()?;
+                    .or_dismiss()?;
             }
             model::CRDTCommand::HashUnsetKey(key, member) => {
                 log::debug!("deleting hash key {} member {}", key, member);
