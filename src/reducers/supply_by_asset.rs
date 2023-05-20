@@ -63,8 +63,11 @@ impl Reducer {
 
         if let Ok(asset_name_str) = String::from_utf8(asset.to_vec()) {
             if let Ok(fingerprint_str) = self.asset_fingerprint([hex::encode(policy).as_str(), hex::encode(asset_name_str).as_str()]) {
-                let crdt = model::CRDTCommand::HashCounter(format!("{}.{}", key, hex::encode(policy)), fingerprint_str, qty);
-                output.send(crdt.into())?;
+                if fingerprint_str != "asset1s7nlt45cc82upqewvjtgu7g97l7eg483c6wu75" {
+                    let crdt = model::CRDTCommand::HashCounter(format!("{}.{}", key, hex::encode(policy)), fingerprint_str, qty);
+                    output.send(crdt.into())?;
+                }
+
             }
 
         }
