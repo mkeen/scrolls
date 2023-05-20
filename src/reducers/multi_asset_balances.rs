@@ -9,7 +9,6 @@ use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
 use pallas::ledger::addresses::{Address, StakeAddress};
 use std::collections::HashMap;
-use crate::model::{Delta};
 use std::result::Result;
 
 #[derive(Serialize, Deserialize)]
