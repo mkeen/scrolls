@@ -237,7 +237,7 @@ impl gasket::runtime::Worker for Worker {
                     .or_restart()?;
             }
             model::CRDTCommand::PNCounter(key, delta) => {
-                log::debug!("increasing counter [{}], by [{}]", key, value);
+                log::debug!("increasing counter [{}], by [{}]", key, delta);
 
                 self.connection
                     .as_mut()
