@@ -140,6 +140,7 @@ pub enum CRDTCommand {
     HashCounter(Key, Member, i128),
     HashSetValue(Key, Member, Value),
     HashUnsetKey(Key, Member),
+    UnsetKey(Key),
     BlockFinished(Point),
 }
 
@@ -242,6 +243,15 @@ impl CRDTCommand {
         };
 
         CRDTCommand::HashSetValue(member, key, value.into())
+    }
+
+    pub fn unset_key(prefix: Option<&str>, key: String) -> CRDTCommand {
+        let key = match prefix {
+            Some(prefix) => format!("{}.{}", prefix, key.to_string()),
+            None => key.to_string(),
+        };
+
+        CRDTCommand::UnsetKey(key)
     }
 
     pub fn hash_del_key(prefix: Option<&str>, member: String, key: &str) -> CRDTCommand {

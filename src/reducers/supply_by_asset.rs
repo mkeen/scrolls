@@ -3,7 +3,6 @@ use bech32::{ToBase32, Variant};
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
 
-use gasket::error::AsWorkError;
 use pallas::crypto::hash::Hash;
 use pallas::ledger::addresses::{Address, StakeAddress};
 use pallas::ledger::traverse::Asset;
@@ -18,10 +17,25 @@ pub struct Config {
     pub policy_ids_hex: Option<Vec<String>>,
 }
 
+fn asset_fingerprint(
+    data_list: [&str; 2],
+) -> Result<String, bech32::Error> {
+    let combined_parts = data_list.join("");
+    let raw = hex::decode(combined_parts).unwrap();
+    let mut hasher = Blake2bVar::new(20).unwrap();
+    hasher.update(&raw);
+    let mut buf = [0u8; 20];
+    hasher.finalize_variable(&mut buf).unwrap();
+    let base32_combined = buf.to_base32();
+    bech32::encode("asset", base32_combined, Variant::Bech32)
+}
+
 pub struct Reducer {
     config: Config,
+    chain: crosscut::ChainWellKnownInfo,
     policy: crosscut::policies::RuntimePolicy,
     policy_ids: Option<Vec<Hash<28>>>,
+    time: crosscut::time::NaiveProvider,
 }
 
 impl Reducer {
@@ -47,50 +61,47 @@ impl Reducer {
     fn process_asset(
         &mut self,
         policy: &Hash<28>,
-        asset: &Vec<u8>,
-        qty: i128,
+        fingerprint: &str,
+        timestamp: &str,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         if !self.is_policy_id_accepted(&policy) {
             return Ok(());
         }
 
-        let asset_id = &format!("{}{}", policy, hex::encode(asset));
-
         let key = match &self.config.key_prefix {
             Some(prefix) => prefix.to_string(),
-            None => format!("{}.{}", "supply_by_asset".to_string(), asset_id),
+            None => "policy".to_string(),
         };
 
-        if let Ok(asset_name_str) = String::from_utf8(asset.to_vec()) {
-            if let Ok(fingerprint_str) = self.asset_fingerprint([hex::encode(policy).as_str(), hex::encode(asset_name_str).as_str()]) {
-                if fingerprint_str != "asset1s7nlt45cc82upqewvjtgu7g97l7eg483c6wu75" {
-                    let crdt = model::CRDTCommand::HashCounter(format!("{}.{}", key, hex::encode(policy)), fingerprint_str, qty);
-                    output.send(crdt.into())?;
-                }
-
-            }
-
-        }
-
-        Ok(())
-
+        let crdt = model::CRDTCommand::HashSetValue(format!("{}.{}", key, hex::encode(policy)), fingerprint.to_string(), timestamp.to_string().into());
+        output.send(crdt.into())
     }
 
     pub fn reduce_block<'b>(
         &mut self,
         block: &'b MultiEraBlock<'b>,
-        ctx: &model::BlockContext,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         for tx in block.txs().into_iter() {
-            if let Some(mints) = tx.mint().as_alonzo() {
-                for (policy, assets) in mints.iter() {
-                    for (name, amount) in assets.iter() {
-                        self.process_asset(policy, name, *amount as i128, output)?;
+            for (value, out) in tx.produces().iter() {
+                for asset in out.non_ada_assets() {
+                    if let Asset::NativeAsset(policy_id, asset_name, _) = asset {
+                        let asset_name = hex::encode(asset_name);
+
+                        if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
+                            if !fingerprint.is_empty() {
+                                self.process_asset(&policy_id, &fingerprint, &self.time.slot_to_wallclock(block.slot()).to_string(), output)?;
+                            }
+
+                        }
+
                     }
+
                 }
+
             }
+
         }
 
         Ok(())
@@ -98,7 +109,7 @@ impl Reducer {
 }
 
 impl Config {
-    pub fn plugin(self, policy: &crosscut::policies::RuntimePolicy) -> super::Reducer {
+    pub fn plugin(self, chain: &crosscut::ChainWellKnownInfo, policy: &crosscut::policies::RuntimePolicy) -> super::Reducer {
         let policy_ids: Option<Vec<Hash<28>>> = match &self.policy_ids_hex {
             Some(pids) => {
                 let ps = pids
@@ -113,7 +124,9 @@ impl Config {
 
         let reducer = Reducer {
             config: self,
+            chain: chain.clone(),
             policy: policy.clone(),
+            time: crosscut::time::NaiveProvider::new(chain.clone()),
             policy_ids,
         };
 

@@ -1,7 +1,13 @@
+use std::collections::HashMap;
+use std::hash::Hash;
 use pallas::ledger::addresses::{Address, StakeAddress};
-use pallas::ledger::traverse::MultiEraOutput;
+use pallas::ledger::traverse::{Asset, MultiEraOutput};
 use pallas::ledger::traverse::{MultiEraBlock, MultiEraTx, OutputRef};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use bech32::{ToBase32, Variant};
+use blake2::digest::{Update, VariableOutput};
+use blake2::Blake2bVar;
 
 use crate::{crosscut, model, prelude::*};
 
@@ -14,6 +20,29 @@ pub struct Config {
 pub struct Reducer {
     config: Config,
     policy: crosscut::policies::RuntimePolicy,
+}
+
+// hash and index are stored in the key
+#[derive(Deserialize, Serialize)]
+pub struct DropKingMultiAssetUTXO {
+    policy_id: String,
+    name: String,
+    quantity: u64,
+    tx_address: String,
+    fingerprint: String,
+}
+
+fn asset_fingerprint(
+    data_list: [&str; 2],
+) -> Result<String, bech32::Error> {
+    let combined_parts = data_list.join("");
+    let raw = hex::decode(combined_parts).unwrap();
+    let mut hasher = Blake2bVar::new(20).unwrap();
+    hasher.update(&raw);
+    let mut buf = [0u8; 20];
+    hasher.finalize_variable(&mut buf).unwrap();
+    let base32_combined = buf.to_base32();
+    bech32::encode("asset", base32_combined, Variant::Bech32)
 }
 
 impl Reducer {
@@ -60,7 +89,13 @@ impl Reducer {
                 input.to_string(),
             );
 
+            let crdt2 = model::CRDTCommand::unset_key(
+                self.config.key_prefix.as_deref(),
+                format!("{}#{}", hex::encode(input.hash()), input.index()),
+            );
+
             output.send(crdt.into());
+            output.send(crdt2.into());
         }
 
         Ok(())
@@ -84,6 +119,8 @@ impl Reducer {
 
         if let Ok(raw_address) = &tx_output.address() {
             let soa = self.stake_or_address_from_address(raw_address);
+
+            // Basic utxo info
             let crdt = model::CRDTCommand::set_add(
                 self.config.key_prefix.as_deref(),
                 &soa,
@@ -91,6 +128,31 @@ impl Reducer {
             );
 
             output.send(crdt.into());
+
+            // Advanced utxo info
+            let mut assetsToIncludeInUtxo: Vec<String> = vec![];
+            for asset in tx_output.non_ada_assets() {
+                if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
+                    let asset_name = hex::encode(asset_name);
+
+                    if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
+                        if !fingerprint.is_empty() {
+                            let crdt2 = model::CRDTCommand::set_add(
+                                self.config.key_prefix.as_deref(),
+                                format!("{}#{}", tx_hash, output_idx).as_str(),
+                                format!("{}/{}/{}/{}", address, hex::encode(policy_id), fingerprint, quantity),
+                            );
+
+                            output.send(crdt2.into());
+                        }
+
+                    }
+
+                };
+
+
+            }
+
 
         }
 
@@ -103,7 +165,6 @@ impl Reducer {
         ctx: &model::BlockContext,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        log::debug!("helllooooo!!");
         for tx in block.txs().into_iter() {
             for consumed in tx.consumes().iter().map(|i| i.output_ref()) {
                 self.process_consumed_txo(&ctx, &consumed, output).expect("TODO: panic message");

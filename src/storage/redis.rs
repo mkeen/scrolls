@@ -279,6 +279,15 @@ impl gasket::runtime::Worker for Worker {
                     .hdel(member, key)
                     .or_restart()?;
             }
+            model::CRDTCommand::UnsetKey(key) => {
+                log::debug!("deleting key {}", key);
+
+                self.connection
+                    .as_mut()
+                    .unwrap()
+                    .del(key)
+                    .or_restart()?;
+            }
             model::CRDTCommand::BlockFinished(point) => {
                 let cursor_str = crosscut::PointArg::from(point).to_string();
                 self.connection
