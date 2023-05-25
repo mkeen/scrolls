@@ -133,7 +133,7 @@ impl Reducer {
             let crdt3 = model::CRDTCommand::set_add(
                 self.config.key_prefix.as_deref(),
                 format!("{}#{}", tx_hash, output_idx).as_str(),
-                format!("{}/{}/{}/{}", address, "", "lovelace", tx_output.lovelace_amount()),
+                format!("{}/{}/{}/{}", address, "c", "l", tx_output.lovelace_amount()),
             );
 
             output.send(crdt3.into());
