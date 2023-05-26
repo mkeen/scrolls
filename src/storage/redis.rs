@@ -11,6 +11,7 @@ use redis::{Cmd, Commands, ConnectionLike, ToRedisArgs};
 use serde::Deserialize;
 
 use crate::{bootstrap, crosscut, model};
+use crate::model::{Member, Value};
 
 type InputPort = gasket::messaging::TwoPhaseInputPort<model::CRDTCommand>;
 
@@ -245,6 +246,20 @@ impl gasket::runtime::Worker for Worker {
                         .arg("INCRBYFLOAT")
                         .arg(key)
                         .arg(delta.to_string()))
+                    .or_restart()?;
+            }
+            model::CRDTCommand::HashSetMulti(key, members, values) => {
+                log::debug!("setting hash multi on key {} for {} members", key, members.len());
+
+                let mut tuples: Vec<(Member, Value)> = vec![];
+                for (index, member) in members.iter().enumerate() {
+                    tuples.push((member.to_owned(), values[index].clone()));
+                }
+
+                self.connection
+                    .as_mut()
+                    .unwrap()
+                    .hset_multiple(key, &tuples)
                     .or_restart()?;
             }
             model::CRDTCommand::HashSetValue(key, member, value) => {

@@ -128,6 +128,9 @@ impl gasket::runtime::Worker for Worker {
             model::CRDTCommand::PNCounter(key, value) => {
                 log::debug!("increasing counter [{}], by [{}]", key, value);
             }
+            model::CRDTCommand::HashSetMulti(key, members, _) => {
+                log::debug!("setting hash multi on key {} for {} members", key, members.len());
+            }
             model::CRDTCommand::HashSetValue(key, member, _) => {
                 log::debug!("setting hash key {} member {}", key, member);
             }

@@ -137,6 +137,7 @@ pub enum CRDTCommand {
     AnyWriteWins(Key, Value),
     // TODO make sure Value is a generic not stringly typed
     PNCounter(Key, i128),
+    HashSetMulti(Key, Vec<Member>, Vec<Value>),
     HashCounter(Key, Member, i128),
     HashSetValue(Key, Member, Value),
     HashUnsetKey(Key, Member),
@@ -243,6 +244,28 @@ impl CRDTCommand {
         };
 
         CRDTCommand::HashSetValue(member, key, value.into())
+    }
+
+    pub fn hash_set_multi<V>(
+        prefix: Option<&str>,
+        key: Key,
+        members: Vec<Member>,
+        values: Vec<V>,
+    ) -> CRDTCommand
+        where
+            V: Into<Value>,
+    {
+        let key = match prefix {
+            Some(prefix) => format!("{}.{}", prefix, key.to_string()),
+            None => key.to_string(),
+        };
+
+        let mut string_values: Vec<Value> = vec![];
+        for value in values {
+            string_values.push(value.into())
+        }
+
+        CRDTCommand::HashSetMulti(key, members, string_values)
     }
 
     pub fn unset_key(prefix: Option<&str>, key: String) -> CRDTCommand {
