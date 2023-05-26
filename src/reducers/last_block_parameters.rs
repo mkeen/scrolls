@@ -39,12 +39,12 @@ impl Reducer {
             Value::String(block.tx_count().to_string().into()), // using a string here to move fast.. some other shits up with bigint for this .into()
         ];
 
-        if let first_tx_hash = block.txs().first().unwrap() {
+        if let Some(first_tx_hash) = block.txs().first() {
             memberKeys.push("first_transaction_hash".into());
             memberValues.push(first_tx_hash.hash().to_string().into())
         }
 
-        if let last_tx_hash = block.txs().last().unwrap() {
+        if let Some(last_tx_hash) = block.txs().last() {
             memberKeys.push("last_transaction_hash".into());
             memberValues.push(last_tx_hash.hash().to_string().into())
         }
