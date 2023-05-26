@@ -33,12 +33,12 @@ impl Reducer {
             key,
             vec!["epoch_no".into(), "height".into(), "slot_no".into(), "block_hash".into(), "block_era".into(), "transactions_count".into(), "first_transaction_hash".into(), "last_transaction_hash".into()],
             vec![
-                Value::BigInt(block_epoch(&self.chain, block) as i128),
+                Value::BigInt(block_epoch(&self.chain, block).into()),
                 Value::BigInt(block.number().into()),
                 Value::BigInt(block.slot().into()),
                 block.hash().to_string().into(),
                 block.era().to_string().into(),
-                Value::BigInt(block.tx_count() as i128),
+                Value::String(block.tx_count().to_string().into()), // using a string here to move fast.. some other shits up with bigint for this .into()
                 block.txs().first().unwrap().hash().to_string().into(),
                 block.txs().last().unwrap().hash().to_string().into(),
             ]
