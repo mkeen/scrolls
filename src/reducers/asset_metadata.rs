@@ -185,7 +185,12 @@ impl Reducer {
 
                     let meta_payload = match projection {
                         Projection::Json => {
-                            self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_metadata, cip)
+                            if cip == CIP27_META_ROYALTIES {
+                                serde_json::to_string(&asset_metadata).unwrap()
+                            } else {
+                                self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_metadata, cip)
+                            }
+
                         },
 
                         Projection::Cbor => {
