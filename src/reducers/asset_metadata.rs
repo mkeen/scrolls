@@ -34,6 +34,7 @@ pub struct Config {
     pub key_prefix: Option<String>,
     pub historical_metadata: Option<bool>,
     pub policy_asset_index: Option<bool>,
+    pub royalty_metadata: Option<bool>,
     pub projection: Option<Projection>,
     pub filter: Option<crosscut::filters::Predicate>,
 }
@@ -45,7 +46,8 @@ pub struct Reducer {
 }
 
 const CIP25_META_NFT: u64 = 721;
-const CIP25_META_TOKEN: u64 = 20;
+const U_20_META_TOKEN: u64 = 20;
+const CIP27_META_ROYALTIES: u64 = 777;
 
 fn kv_pairs_to_hashmap(kv_pairs: &KeyValuePairs<Metadatum, Metadatum>
 ) -> serde_json::Map<String, Value> {
@@ -164,10 +166,11 @@ impl Reducer {
         asset_name_str: String,
         slot_no: u64
     ) {
-        let prefix = self.config.key_prefix.as_deref().unwrap_or("asset-metadata");
+        let prefix = self.config.key_prefix.as_deref().unwrap_or("m");
         let projection = self.config.projection.unwrap_or_default();
         let should_keep_asset_index = self.config.policy_asset_index.unwrap_or(false);
         let should_keep_historical_metadata = self.config.historical_metadata.unwrap_or(false);
+        let should_store_royalty_metadata = self.config.royalty_metadata.unwrap_or(true);
 
         if let Some(policy_assets) = self.find_metadata_policy_assets(&policy_map, &policy_id_str) {
             let filtered_policy_assets = policy_assets.iter().find(|(l, _)| {
@@ -193,6 +196,15 @@ impl Reducer {
                     };
 
                     if !meta_payload.is_empty() {
+                        if should_store_royalty_metadata && cip == CIP27_META_ROYALTIES {
+                            minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::LastWriteWins(
+                                format!("{}.{}.{}", prefix, "r", fingerprint_str.clone()),
+                                meta_payload.clone().into(),
+                                timestamp,
+                            ));
+
+                        }
+
                         if should_keep_historical_metadata {
                             minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::LastWriteWins(
                                 format!("{}.{}", prefix, fingerprint_str.clone()),
@@ -246,7 +258,7 @@ impl Reducer {
                     if let Ok(asset_name_str) = String::from_utf8(asset_name.to_vec()) {
                         if !policy_id_str.is_empty() {
                             let metadata = tx.metadata();
-                            for supported_metadata_cip in vec![CIP25_META_NFT, CIP25_META_TOKEN] {
+                            for supported_metadata_cip in vec![CIP25_META_NFT, U_20_META_TOKEN, CIP27_META_ROYALTIES] {
                                 if let Some(policy_map) = metadata.find(MetadatumLabel::from(supported_metadata_cip)) {
                                     self.extract_token_metadata(
                                         supported_metadata_cip,
@@ -287,7 +299,7 @@ impl Reducer {
             // Make sure the TX is worth processing for the use-case (metadata extraction). It should have minted at least one asset with the CIP25_META key present in metadata.
             // Currently this will send thru a TX that is just a burn with no mint, but it will be handled in the reducer.
             // Todo: could be cleaner using a filter
-            if tx.mint().len() > 0 && tx.metadata().as_alonzo().iter().any(|meta| meta.iter().any(|(key, _)| *key == CIP25_META_TOKEN || *key == CIP25_META_NFT)) {
+            if tx.mint().len() > 0 && tx.metadata().as_alonzo().iter().any(|meta| meta.iter().any(|(key, _)| *key == U_20_META_TOKEN || *key == CIP25_META_NFT || *key == CIP27_META_ROYALTIES)) {
                 self.send(block, tx, output)?;
             }
 

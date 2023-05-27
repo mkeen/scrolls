@@ -144,7 +144,7 @@ impl Reducer {
             spending
         );
 
-        let prefix = self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string());
+        let prefix = self.config.key_prefix.clone().unwrap_or("w".to_string());
 
         if !fingerprint_tallies.is_empty() {
             for (soa, quantity_map) in fingerprint_tallies.clone() {
@@ -167,7 +167,7 @@ impl Reducer {
                 }
 
                 output.send(gasket::messaging::Message::from(model::CRDTCommand::AnyWriteWins(
-                    format!("{}.latest.{}", self.config.key_prefix.clone().unwrap_or("soa-wallet".to_string()), soa),
+                    format!("{}.latest.{}", prefix, soa),
                     self.time.slot_to_wallclock(slot).to_string().into(),
                 )));
 
@@ -177,6 +177,11 @@ impl Reducer {
 
         if !policy_asset_owners.is_empty() {
             for (policy_id, asset_to_owner) in policy_asset_owners {
+                output.send(gasket::messaging::Message::from(model::CRDTCommand::AnyWriteWins(
+                    format!("{}.lp.{}", prefix, policy_id),
+                    self.time.slot_to_wallclock(slot).to_string().into(),
+                )))?;
+
                 for (fingerprint, soas) in asset_to_owner {
                     for (soa, quantity) in soas {
                         if !soa.is_empty() {
@@ -185,7 +190,7 @@ impl Reducer {
                                     format!("{}.owned.{}", prefix, fingerprint),
                                     soa.clone(),
                                     quantity,
-                                )));
+                                )))?;
 
                             }
 

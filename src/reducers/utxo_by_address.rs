@@ -129,17 +129,7 @@ impl Reducer {
 
             output.send(crdt.into());
 
-            // Simple ADA Info
-            let crdt3 = model::CRDTCommand::set_add(
-                self.config.key_prefix.as_deref(),
-                format!("{}#{}", tx_hash, output_idx).as_str(),
-                format!("{}/{}/{}/{}", address, "c", "l", tx_output.lovelace_amount()),
-            );
-
-            output.send(crdt3.into());
-
             // Advanced utxo info
-            let mut assetsToIncludeInUtxo: Vec<String> = vec![];
             for asset in tx_output.non_ada_assets() {
                 if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
                     let asset_name = hex::encode(asset_name);
