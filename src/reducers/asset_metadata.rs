@@ -16,6 +16,7 @@ use serde_json::{Value};
 use hex::{self};
 
 use crate::{crosscut, model};
+use crate::model::CRDTCommand;
 
 #[derive(Copy, Clone, Deserialize, Serialize)]
 pub enum Projection {
@@ -157,10 +158,10 @@ impl Reducer {
         serde_json::to_string(&std_wrap_map).unwrap()
     }
 
-    fn extract_token_metadata(
+    fn prepare_meta_agg_cmds(
         &self,
         cip: u64,
-        minted_assets_unique: &mut HashMap<String, model::CRDTCommand>,
+        minted_assets_unique: &mut HashMap<String, Vec<model::CRDTCommand>>,
         policy_map: &Metadatum,
         policy_id_str: String,
         asset_name_str: String,
@@ -185,12 +186,7 @@ impl Reducer {
 
                     let meta_payload = match projection {
                         Projection::Json => {
-                            if cip == CIP27_META_ROYALTIES {
-                                serde_json::to_string(&asset_metadata).unwrap()
-                            } else {
-                                self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_metadata, cip)
-                            }
-
+                            self.get_metadata_fragment(asset_name_str, policy_id_str.clone(), asset_metadata, cip)
                         },
 
                         Projection::Cbor => {
@@ -201,8 +197,11 @@ impl Reducer {
                     };
 
                     if !meta_payload.is_empty() {
+                        let mut m_vec: Vec<CRDTCommand> = vec![];
+                        let mut minted_a = minted_assets_unique.entry(fingerprint_str.clone()).or_insert(m_vec);
+
                         if should_store_royalty_metadata && cip == CIP27_META_ROYALTIES {
-                            minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::LastWriteWins(
+                            minted_a.push(model::CRDTCommand::LastWriteWins(
                                 format!("{}.{}.{}", prefix, "r", policy_id_str.clone()),
                                 meta_payload.clone().into(),
                                 timestamp,
@@ -211,14 +210,14 @@ impl Reducer {
                         }
 
                         if should_keep_historical_metadata {
-                            minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::LastWriteWins(
+                            minted_a.push(model::CRDTCommand::LastWriteWins(
                                 format!("{}.{}", prefix, fingerprint_str.clone()),
                                 meta_payload.clone().into(),
                                 timestamp,
                             ));
 
                         } else {
-                            minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::AnyWriteWins(
+                            minted_a.push(model::CRDTCommand::AnyWriteWins(
                                 format!("{}.{}", prefix, fingerprint_str.clone()),
                                 model::Value::String(meta_payload.clone()),
                             ));
@@ -226,7 +225,7 @@ impl Reducer {
                         };
 
                         if should_keep_asset_index {
-                            minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::LastWriteWins(
+                            minted_a.push(model::CRDTCommand::LastWriteWins(
                                 format!("{}.{}", prefix, policy_id_str),
                                 fingerprint_str.clone().into(),
                                 timestamp,
@@ -251,7 +250,7 @@ impl Reducer {
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         if let Some(safe_mint) = tx.mint().as_alonzo() {
-            let mut minted_assets_unique: HashMap<String, model::CRDTCommand> = HashMap::new();
+            let mut minted_assets_unique: HashMap<String, Vec<model::CRDTCommand>> = HashMap::new();
 
             for (policy_id, assets) in safe_mint.iter() {
                 let policy_id_str = hex::encode(policy_id);
@@ -265,7 +264,7 @@ impl Reducer {
                             let metadata = tx.metadata();
                             for supported_metadata_cip in vec![CIP25_META_NFT, U_20_META_TOKEN, CIP27_META_ROYALTIES] {
                                 if let Some(policy_map) = metadata.find(MetadatumLabel::from(supported_metadata_cip)) {
-                                    self.extract_token_metadata(
+                                    self.prepare_meta_agg_cmds(
                                         supported_metadata_cip,
                                         &mut minted_assets_unique,
                                         policy_map,
@@ -286,8 +285,11 @@ impl Reducer {
 
             }
 
-            for (_, cmd) in minted_assets_unique {
-                output.send(gasket::messaging::Message::from(cmd));
+            for (_, cmds) in minted_assets_unique {
+                for cmd in cmds {
+                    output.send(gasket::messaging::Message::from(cmd));
+                }
+
             }
 
         }
