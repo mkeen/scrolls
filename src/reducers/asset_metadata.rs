@@ -203,7 +203,7 @@ impl Reducer {
                     if !meta_payload.is_empty() {
                         if should_store_royalty_metadata && cip == CIP27_META_ROYALTIES {
                             minted_assets_unique.entry(fingerprint_str.clone()).or_insert(model::CRDTCommand::LastWriteWins(
-                                format!("{}.{}.{}", prefix, "r", fingerprint_str.clone()),
+                                format!("{}.{}.{}", prefix, "r", policy_id_str.clone()),
                                 meta_payload.clone().into(),
                                 timestamp,
                             ));
