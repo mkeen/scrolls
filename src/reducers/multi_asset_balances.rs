@@ -167,7 +167,7 @@ impl Reducer {
                 }
 
                 output.send(gasket::messaging::Message::from(model::CRDTCommand::AnyWriteWins(
-                    format!("{}.latest.{}", prefix, soa),
+                    format!("{}.l.{}", prefix, soa),
                     self.time.slot_to_wallclock(slot).to_string().into(),
                 )));
 
