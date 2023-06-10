@@ -141,12 +141,13 @@ impl Reducer {
                 format!("{}#{}", tx_hash, output_idx),
             );
 
-            let crdt = model::CRDTCommand::set_add(
+            let crdt2 = model::CRDTCommand::set_add(
                 self.config.coin_key_prefix.as_deref(),
                 &format!("{}#{}", tx_hash, output_idx),
                 format!("{}/{}", tx_output.address().unwrap().to_bech32().unwrap_or(tx_output.address().unwrap().to_string()), tx_output.lovelace_amount().to_string()),
             );
 
+            output.send(crdt2.into());
             output.send(crdt.into());
 
             // Advanced utxo info
