@@ -8,12 +8,13 @@ pub mod n2c;
 
 pub mod n2n;
 pub mod utils;
+pub mod grpc;
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
 pub enum Config {
     N2N(n2n::Config),
-
+    GRPC(grpc::Config),
     #[cfg(target_family = "unix")]
     N2C(n2c::Config),
 }
@@ -27,6 +28,7 @@ impl Config {
         policy: &crosscut::policies::RuntimePolicy,
     ) -> Bootstrapper {
         match self {
+            Config::GRPC(c) => Bootstrapper::GRPC(c.bootstrapper(chain, intersect, finalize, policy)),
             Config::N2N(c) => Bootstrapper::N2N(c.bootstrapper(chain, intersect, finalize, policy)),
             Config::N2C(c) => Bootstrapper::N2C(c.bootstrapper(chain, intersect, finalize, policy)),
         }
@@ -36,6 +38,7 @@ impl Config {
 pub enum Bootstrapper {
     N2N(n2n::Bootstrapper),
     N2C(n2c::Bootstrapper),
+    GRPC(grpc::Bootstrapper),
 }
 
 impl Bootstrapper {
@@ -43,6 +46,7 @@ impl Bootstrapper {
         match self {
             Bootstrapper::N2N(p) => p.borrow_output_port(),
             Bootstrapper::N2C(p) => p.borrow_output_port(),
+            Bootstrapper::GRPC(p) => p.borrow_output_port(),
         }
     }
 
@@ -50,6 +54,7 @@ impl Bootstrapper {
         match self {
             Bootstrapper::N2N(p) => p.spawn_stages(pipeline, cursor),
             Bootstrapper::N2C(p) => p.spawn_stages(pipeline, cursor),
+            Bootstrapper::GRPC(p) => p.spawn_stages(pipeline, cursor),
         }
     }
 }

@@ -29,6 +29,8 @@ impl Reducer {
             None => format!("{}", def_key_prefix.to_string()),
         };
 
+
+
         let mut memberKeys = vec!["epoch_no".into(), "height".into(), "slot_no".into(), "block_hash".into(), "block_era".into(), "transactions_count".into()];
         let mut memberValues = vec![
             Value::BigInt(block_epoch(&self.chain, block).into()),
@@ -57,6 +59,7 @@ impl Reducer {
 
         output.send(gasket::messaging::Message::from(crdt))
     }
+
 }
 
 impl Config {

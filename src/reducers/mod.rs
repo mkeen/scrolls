@@ -28,7 +28,7 @@ pub mod block_header_by_hash;
 #[cfg(feature = "unstable")]
 pub mod last_block_parameters;
 #[cfg(feature = "unstable")]
-pub mod supply_by_asset;
+pub mod policy_assets_moved;
 #[cfg(feature = "unstable")]
 pub mod tx_by_hash;
 #[cfg(feature = "unstable")]
@@ -76,7 +76,7 @@ pub enum Config {
     #[cfg(feature = "unstable")]
     UtxoByStake(utxo_by_stake::Config),
     #[cfg(feature = "unstable")]
-    SupplyByAsset(supply_by_asset::Config),
+    SupplyByAsset(policy_assets_moved::Config),
     #[cfg(feature = "unstable")]
     AddressesByStake(addresses_by_stake::Config),
     #[cfg(feature = "unstable")]
@@ -203,7 +203,7 @@ pub enum Reducer {
     #[cfg(feature = "unstable")]
     UtxoByStake(utxo_by_stake::Reducer),
     #[cfg(feature = "unstable")]
-    SupplyByAsset(supply_by_asset::Reducer),
+    SupplyByAsset(policy_assets_moved::Reducer),
     #[cfg(feature = "unstable")]
     AddressesByStake(addresses_by_stake::Reducer),
     #[cfg(feature = "unstable")]
@@ -247,7 +247,7 @@ impl Reducer {
             #[cfg(feature = "unstable")]
             Reducer::UtxoByStake(x) => x.reduce_block(block, ctx, output),
             #[cfg(feature = "unstable")]
-            Reducer::SupplyByAsset(x) => x.reduce_block(block, output),
+            Reducer::SupplyByAsset(x) => x.reduce_block(block, ctx, output),
             #[cfg(feature = "unstable")]
             Reducer::AddressesByStake(x) => x.reduce_block(block, ctx, output),
             #[cfg(feature = "unstable")]

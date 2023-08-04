@@ -2,10 +2,11 @@ use std::str::FromStr;
 use bech32::{ToBase32, Variant};
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
+use log::warn;
 
 use pallas::crypto::hash::Hash;
 use pallas::ledger::addresses::{Address, StakeAddress};
-use pallas::ledger::traverse::Asset;
+use pallas::ledger::traverse::{Asset, ComputeHash, OutputRef};
 use pallas::ledger::traverse::MultiEraBlock;
 use serde::Deserialize;
 
@@ -81,10 +82,11 @@ impl Reducer {
     pub fn reduce_block<'b>(
         &mut self,
         block: &'b MultiEraBlock<'b>,
+        ctx: &model::BlockContext,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         for tx in block.txs().into_iter() {
-            for (value, out) in tx.produces().iter() {
+            for (_, out) in tx.produces().iter() {
                 for asset in out.non_ada_assets() {
                     if let Asset::NativeAsset(policy_id, asset_name, _) = asset {
                         let asset_name = hex::encode(asset_name);
@@ -106,6 +108,7 @@ impl Reducer {
 
         Ok(())
     }
+
 }
 
 impl Config {

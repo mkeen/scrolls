@@ -27,7 +27,6 @@ pub struct Worker {
     cursor: storage::Cursor,
     finalize: Option<crosscut::FinalizeConfig>,
     chainsync: Option<chainsync::N2CClient<StdChannel>>,
-
     output: OutputPort,
     block_count: gasket::metrics::Counter,
     chain_tip: gasket::metrics::Gauge,
