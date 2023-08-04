@@ -133,6 +133,6 @@ impl Config {
             policy_ids,
         };
 
-        super::Reducer::SupplyByAsset(reducer)
+        super::Reducer::PolicyAssetsMoved(reducer)
     }
 }
