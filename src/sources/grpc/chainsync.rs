@@ -164,7 +164,7 @@ impl gasket::runtime::Worker for Worker {
 
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
         let transport = Transport::setup(&self.address).unwrap();
-        self.chainsync = Some(transport.channel6);
+        self.chainsync = Some(transport.channel7);
         Ok(())
     }
 
