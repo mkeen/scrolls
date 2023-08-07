@@ -45,6 +45,7 @@ impl Reducer {
         &mut self,
         block: &'b MultiEraBlock<'b>,
         output: &mut super::OutputPort,
+        rollback: bool,
     ) -> Result<(), gasket::error::Error> {
         let slot = block.slot();
 

@@ -87,7 +87,7 @@ impl Worker {
         Ok(())
     }
 
-    fn on_rollback(&mut self, point: &Point) -> Result<(), gasket::error::Error> {
+    fn on_rollback(&mut self, point: &Point, tip: &Point) -> Result<(), gasket::error::Error> {
         log::debug!("rolling block to point {:?}", point);
 
         match self.chain_buffer.roll_back(point) {
@@ -96,8 +96,6 @@ impl Worker {
             }
             chainsync::RollbackEffect::OutOfScope => {
                 log::debug!("rollback out of buffer scope, sending event down the pipeline");
-                self.output
-                    .send(model::RawBlockPayload::roll_back(point.clone()))?;
             }
         }
 
@@ -121,7 +119,7 @@ impl Worker {
                 Ok(())
             }
             chainsync::NextResponse::RollBackward(p, t) => {
-                self.on_rollback(&p)?;
+                self.on_rollback(&p, &t.0)?;
                 self.chain_tip.set(t.1 as i64);
                 Ok(())
             }
@@ -149,7 +147,7 @@ impl Worker {
                 Ok(())
             }
             chainsync::NextResponse::RollBackward(p, t) => {
-                self.on_rollback(&p)?;
+                self.on_rollback(&p, &t.0)?;
                 self.chain_tip.set(t.1 as i64);
                 Ok(())
             }

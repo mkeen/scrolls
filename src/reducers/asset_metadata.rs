@@ -47,7 +47,6 @@ pub struct Reducer {
 }
 
 const CIP25_META_NFT: u64 = 721;
-const U_20_META_TOKEN: u64 = 20;
 const CIP27_META_ROYALTIES: u64 = 777;
 
 fn kv_pairs_to_hashmap(kv_pairs: &KeyValuePairs<Metadatum, Metadatum>
@@ -291,6 +290,7 @@ impl Reducer {
         &mut self,
         block: &'b MultiEraBlock<'b>,
         output: &mut super::OutputPort,
+        rollback: bool,
     ) -> Result<(), gasket::error::Error> {
         for tx in &block.txs() {
             // Make sure the TX is worth processing for the use-case (metadata extraction). It should have minted at least one asset with the CIP25_META key present in metadata.

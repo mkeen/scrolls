@@ -57,6 +57,7 @@ impl Reducer {
         block: &'b MultiEraBlock<'b>,
         ctx: &model::BlockContext,
         output: &mut super::OutputPort,
+        rollback: bool,
     ) -> Result<(), gasket::error::Error> {
         for tx in block.txs().into_iter() {
             for (tx_ref, tx_output) in ctx.find_consumed_txos(&tx, &self.policy).or_panic()? {

@@ -65,6 +65,7 @@ impl Reducer {
         block: &'b MultiEraBlock<'b>,
         ctx: &model::BlockContext,
         output: &mut super::OutputPort,
+        rollback: bool,
     ) -> Result<(), gasket::error::Error> {
         for tx in block.txs().into_iter() {
             for (idx, produced) in tx.produces() {

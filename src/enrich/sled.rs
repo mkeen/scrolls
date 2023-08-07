@@ -1,17 +1,20 @@
 use std::time::Duration;
+use futures::executor::block_on;
 
 use gasket::{
     error::AsWorkError,
     runtime::{spawn_stage, WorkOutcome},
 };
+use log::log;
 
 use pallas::{
     codec::minicbor,
     ledger::traverse::{Era, MultiEraBlock, MultiEraTx, OutputRef},
 };
+use pallas::codec::minicbor::bytes::nil;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
-use sled::IVec;
+use sled::{Batch, IVec};
 
 use crate::{
     bootstrap, crosscut,
@@ -59,6 +62,7 @@ impl Bootstrapper {
             config: self.config,
             policy: self.policy,
             db: None,
+            db_state_restoration: None,
             input: self.input,
             output: self.output,
             inserts_counter: Default::default(),
@@ -83,6 +87,7 @@ pub struct Worker {
     config: Config,
     policy: crosscut::policies::RuntimePolicy,
     db: Option<sled::Db>,
+    db_state_restoration: Option<sled::Tree>,
     input: InputPort,
     output: OutputPort,
     inserts_counter: gasket::metrics::Counter,
@@ -188,22 +193,80 @@ impl Worker {
         Ok(ctx)
     }
 
-    fn remove_consumed_utxos(&self, db: &sled::Db, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
+    fn remove_consumed_utxos(&self, db: &sled::Db, t: &sled::Tree, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
         let keys: Vec<_> = txs
             .iter()
             .flat_map(|tx| tx.consumes())
             .map(|i| i.output_ref())
             .collect();
 
+        let mut consumed_batch = Batch::default();
+        let mut restore_batch = Batch::default();
+
         for key in keys.iter() {
-            db.remove(key.to_string().as_bytes())
-                .map_err(crate::Error::storage)?;
+            match db.get(key.to_string().as_bytes()) {
+                Ok(current_value) => {
+                    match current_value {
+                        None => {}
+                        Some(c) => { restore_batch.insert(key.to_string().as_bytes(), c) }
+                    }
+
+                }
+
+                Err(_) => {}
+            }
+
+            consumed_batch.remove(key.to_string().as_bytes());
         }
+
+        t.apply_batch(restore_batch).map_err(crate::Error::storage)?;
+        db.apply_batch(consumed_batch).map_err(crate::Error::storage)?;
 
         self.remove_counter.inc(keys.len() as u64);
 
         Ok(())
     }
+
+    fn restore_consumed_utxos(&self, db: &sled::Db, t: &sled::Tree, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
+        let keys: Vec<_> = txs
+            .iter()
+            .flat_map(|tx| tx.consumes())
+            .map(|i| i.output_ref())
+            .collect();
+
+        let mut restore_batch = sled::Batch::default();
+        for key in keys.iter() {
+            let current_value = t.get(key.to_string().as_bytes());
+            match current_value {
+                Ok(v) => {
+                    match v {
+                        None => {}
+                        Some(old_value) => {
+                            if !old_value.is_empty() {
+                                log::warn!("overwriting old value back into play {}", key);
+                                restore_batch.insert(key.to_string().as_bytes(), old_value);
+                                if db.len() > 500 {
+                                    db.pop_min().unwrap();
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                Err(_) => {}
+            }
+
+        }
+
+        db.apply_batch(restore_batch).unwrap();
+
+        Ok(())
+    }
+
 }
 
 impl gasket::runtime::Worker for Worker {
@@ -220,6 +283,9 @@ impl gasket::runtime::Worker for Worker {
     fn work(&mut self) -> gasket::runtime::WorkResult {
         let msg = self.input.recv_or_idle()?;
 
+        let db = self.db.as_ref().unwrap();
+        let restoration_db = self.db_state_restoration.as_ref().unwrap();
+
         match msg.payload {
             model::RawBlockPayload::RollForward(cbor) => {
                 let block = MultiEraBlock::decode(&cbor)
@@ -232,7 +298,6 @@ impl gasket::runtime::Worker for Worker {
                     None => return Ok(gasket::runtime::WorkOutcome::Partial),
                 };
 
-                let db = self.db.as_ref().unwrap();
 
                 let txs = block.txs();
 
@@ -243,17 +308,33 @@ impl gasket::runtime::Worker for Worker {
                 let ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
 
                 // and finally we remove utxos consumed by the block
-                self.remove_consumed_utxos(db, &txs).or_restart()?;
+                self.remove_consumed_utxos(db, restoration_db, &txs).or_restart()?;
 
                 self.output
                     .send(model::EnrichedBlockPayload::roll_forward(cbor, ctx))?;
 
                 self.blocks_counter.inc(1);
             }
-            model::RawBlockPayload::RollBack(x) => {
-                self.output
-                    .send(model::EnrichedBlockPayload::roll_back(x))?;
+            model::RawBlockPayload::RollBack(x, cbor) => {
+                let block = MultiEraBlock::decode(&cbor)
+                    .map_err(crate::Error::cbor)
+                    .apply_policy(&self.policy)
+                    .or_panic().unwrap();
+
+                match block {
+                    None => {}
+                    Some(block) => {
+                        let ctx = self.par_fetch_referenced_utxos(db, &block.txs()).or_restart()?;
+                        self.restore_consumed_utxos(&db, &restoration_db, &block.txs()).unwrap();
+                        self.output
+                            .send(model::EnrichedBlockPayload::roll_forward(cbor, ctx))?;
+                    }
+
+                }
+
+
             }
+
         };
 
         self.input.commit();
@@ -262,7 +343,9 @@ impl gasket::runtime::Worker for Worker {
 
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
         let db = sled::open(&self.config.db_path).or_retry()?;
+        let restoration = db.open_tree("state_restoration").or_retry()?;
         self.db = Some(db);
+        self.db_state_restoration = Some(restoration);
 
         Ok(())
     }
@@ -274,6 +357,16 @@ impl gasket::runtime::Worker for Worker {
                 Ok(())
             }
             None => Ok(()),
-        }
+        }?;
+
+        match &self.db_state_restoration {
+            Some(tree) => {
+                tree.flush().or_panic()?;
+                Ok(())
+            }
+            None => Ok(()),
+        }?;
+
+        Ok(())
     }
 }

@@ -20,6 +20,7 @@ impl Reducer {
         &mut self,
         block: &'b MultiEraBlock<'b>,
         output: &mut super::OutputPort,
+        rollback: bool,
     ) -> Result<(), gasket::error::Error> {
 
         let def_key_prefix = "last_block";
@@ -29,10 +30,8 @@ impl Reducer {
             None => format!("{}", def_key_prefix.to_string()),
         };
 
-
-
-        let mut memberKeys = vec!["epoch_no".into(), "height".into(), "slot_no".into(), "block_hash".into(), "block_era".into(), "transactions_count".into()];
-        let mut memberValues = vec![
+        let mut member_keys = vec!["epoch_no".into(), "height".into(), "slot_no".into(), "block_hash".into(), "block_era".into(), "transactions_count".into()];
+        let mut member_values = vec![
             Value::BigInt(block_epoch(&self.chain, block).into()),
             Value::BigInt(block.number().into()),
             Value::BigInt(block.slot().into()),
@@ -42,19 +41,19 @@ impl Reducer {
         ];
 
         if let Some(first_tx_hash) = block.txs().first() {
-            memberKeys.push("first_transaction_hash".into());
-            memberValues.push(first_tx_hash.hash().to_string().into())
+            member_keys.push("first_transaction_hash".into());
+            member_values.push(first_tx_hash.hash().to_string().into())
         }
 
         if let Some(last_tx_hash) = block.txs().last() {
-            memberKeys.push("last_transaction_hash".into());
-            memberValues.push(last_tx_hash.hash().to_string().into())
+            member_keys.push("last_transaction_hash".into());
+            member_values.push(last_tx_hash.hash().to_string().into())
         }
 
         let crdt = model::CRDTCommand::HashSetMulti(
             key,
-            memberKeys,
-            memberValues,
+            member_keys,
+            member_values,
         );
 
         output.send(gasket::messaging::Message::from(crdt))

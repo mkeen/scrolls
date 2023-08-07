@@ -49,6 +49,7 @@ impl Reducer {
         &mut self,
         block: &MultiEraBlock,
         output: &mut super::OutputPort,
+        rollback: bool,
     ) -> Result<(), gasket::error::Error> {
         if block.era().has_feature(Feature::MultiAssets) {
 

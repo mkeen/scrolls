@@ -7,6 +7,7 @@ use pallas::{
         multiplexer::StdChannel,
     },
 };
+use pallas::network::miniprotocols::chainsync::IntersectResponse;
 
 use crate::{crosscut, storage};
 
@@ -50,5 +51,6 @@ pub fn define_chainsync_start<C: Fragment>(
                 .map_err(crate::Error::ouroboros)?;
             Ok(point)
         }
+
     }
 }

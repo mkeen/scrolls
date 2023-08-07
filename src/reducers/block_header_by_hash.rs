@@ -21,22 +21,23 @@ impl Reducer {
         block: &'b MultiEraBlock<'b>,
         ctx: &model::BlockContext,
         output: &mut super::OutputPort,
+        rollback: bool,
     ) -> Result<(), gasket::error::Error> {
         if filter_matches_block!(self, block, ctx) {
             let value = block
                 .header()
                 .cbor()
                 .to_vec();
-                
+
             let crdt = model::CRDTCommand::any_write_wins(
                 self.config.key_prefix.as_deref(),
                 block.hash(),
                 value
             );
-            
+
             output.send(gasket::messaging::Message::from(crdt))?;
         }
-        
+
         Ok(())
     }
 }

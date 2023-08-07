@@ -7,15 +7,15 @@ use futures::executor;
 use log::log;
 
 pub struct Transport {
-    pub channel6: ChainSyncServiceClient<Channel>,
+    pub channel7: ChainSyncServiceClient<Channel>,
 }
 
 impl Transport {
     pub fn setup(address: &str) -> Result<Self, crate::Error> {
-        let channel6 = executor::block_on(ChainSyncServiceClient::connect(format!("http://{}", address))).unwrap();
+        let channel7 = executor::block_on(ChainSyncServiceClient::connect(format!("grpc://{}", address))).unwrap();
 
         Ok(Self {
-            channel6,
+            channel7,
         })
     }
 }

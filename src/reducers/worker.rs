@@ -1,4 +1,6 @@
 use pallas::ledger::traverse::MultiEraBlock;
+use tonic::IntoRequest;
+use utxorpc::proto::sync::v1::chain_sync_service_server::ChainSyncService;
 
 use crate::{crosscut, model, prelude::*};
 
@@ -37,6 +39,7 @@ impl Worker {
         &mut self,
         block: &'b [u8],
         ctx: &model::BlockContext,
+        rollback: bool,
     ) -> Result<(), gasket::error::Error> {
         let block = MultiEraBlock::decode(block)
             .map_err(crate::Error::cbor)
@@ -55,7 +58,7 @@ impl Worker {
         ))?;
 
         for reducer in self.reducers.iter_mut() {
-            reducer.reduce_block(&block, ctx, &mut self.output)?;
+            reducer.reduce_block(&block, ctx, &mut self.output, rollback)?;
             self.ops_count.inc(1);
         }
 
@@ -80,10 +83,11 @@ impl gasket::runtime::Worker for Worker {
 
         match msg.payload {
             model::EnrichedBlockPayload::RollForward(block, ctx) => {
-                self.reduce_block(&block, &ctx)?
+                self.reduce_block(&block, &ctx, false)?;
             }
-            model::EnrichedBlockPayload::RollBack(point) => {
+            model::EnrichedBlockPayload::RollBack(point, block, ctx) => {
                 log::warn!("rollback requested for {:?}", point);
+                self.reduce_block(&block, &ctx, true)?;
             }
         }
 

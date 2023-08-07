@@ -30,7 +30,9 @@ impl From<ChainConfig> for crosscut::ChainWellKnownInfo {
             ChainConfig::Preview => crosscut::ChainWellKnownInfo::preview(),
             ChainConfig::Custom(x) => x,
         }
+
     }
+
 }
 
 #[derive(Deserialize)]
@@ -112,11 +114,13 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
 
     let enrich = config.enrich.unwrap_or_default().bootstrapper(&policy);
 
+
     let reducer = reducers::Bootstrapper::new(config.reducers, &chain, &policy);
 
     let storage = config.storage.plugin(&chain, &config.intersect, &policy);
 
     let pipeline = bootstrap::build(source, enrich, reducer, storage)?;
+
 
     log::info!("scrolls is running...");
 

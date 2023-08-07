@@ -100,6 +100,7 @@ impl Reducer {
         block: &'b MultiEraBlock<'b>,
         ctx: &model::BlockContext,
         output: &mut super::OutputPort,
+        rollback: bool,
     ) -> Result<(), gasket::error::Error> {
         for tx in block.txs().into_iter() {
             for consumed in tx.consumes().iter().map(|i| i.output_ref()) {
