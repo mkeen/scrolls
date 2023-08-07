@@ -236,7 +236,7 @@ impl Worker {
 
         let mut restore_batch = sled::Batch::default();
         for key in keys.iter() {
-            let current_value = t.get(key.to_string().as_bytes());
+            let current_value = block_on(t.get(key.to_string()).unwrap().as_bytes());
             match current_value {
                 Ok(v) => {
                     match v {

@@ -73,18 +73,16 @@ impl Worker {
     //     &mut self,
     //     content: chainsync::HeaderContent,
     // ) -> Result<(), gasket::error::Error> {
-    //     // parse the header and extract the point of the chain
-    //     // let header = to_traverse(&content)
-    //     //     .apply_policy(&self.policy)
-    //     //     .or_panic()?;
-    //     //
-    //     // let header = match header {
-    //     //     Some(x) => x,
-    //     //     None => return Ok(()),
-    //     // };
-    //     //
-    //     //
-    //     // let point = Point::Specific(header.slot(), header.hash().to_vec());
+    //     let header = to_traverse(&content)
+    //         .apply_policy(&self.policy)
+    //         .or_panic()?;
+    //
+    //     let header = match header {
+    //         Some(x) => x,
+    //         None => return Ok(()),
+    //     };
+    //
+    //     let point = Point::Specific(header.slot(), header.hash().to_vec());
     //
     //     // track the new point in our memory buffer
     //     log::debug!("rolling forward to point {:?}", point);
@@ -92,56 +90,74 @@ impl Worker {
     //
     //     Ok(())
     // }
-
-    // fn on_rollback(&mut self, point: &Point) -> Result<(), gasket::error::Error> {
+    //
+    // fn on_rollback(&mut self, point: &Point, tip: &Point) -> Result<(), gasket::error::Error> {
     //     log::debug!("rolling block to point {:?}", point);
+    //
+    //     if !tip.is_nil() {
+    //         log::debug!("fetching blocks to revert");
+    //         let blocks_to_revert = self
+    //             .blockfetch
+    //             .as_mut()
+    //             .unwrap()
+    //             .fetch_range(Range::from((point.clone(), tip.clone())))
+    //             .or_restart()
+    //             .unwrap();
+    //
+    //         log::warn!("reverting {} blocks", blocks_to_revert.len());
+    //
+    //         for block in blocks_to_revert.iter() {
+    //             log::debug!("rolling back block at {:?}", point);
+    //             self.output.send(model::RawBlockPayload::roll_back(point.clone(), block.clone()))?;
+    //         }
+    //
+    //     }
     //
     //     match self.chain_buffer.roll_back(point) {
     //         chainsync::RollbackEffect::Handled => {
     //             log::debug!("handled rollback within buffer {:?}", point);
     //         }
+    //
     //         chainsync::RollbackEffect::OutOfScope => {
+    //             // todo, it is possible we might want to do something here.. maybe.
     //             log::debug!("rollback out of buffer scope, sending event down the pipeline");
-    //             self.output
-    //                 .send(model::RawBlockPayload::roll_back(point.clone()))?;
     //         }
+    //
     //     }
     //
     //     Ok(())
     // }
-
+    //
     // fn request_next(&mut self) -> Result<(), gasket::error::Error> {
     //     log::info!("requesting next block");
     //
+    //     let next = self
+    //         .chainsync
+    //         .as_mut()
+    //         .unwrap()
+    //         .into_request()
+    //         .or_restart()?;
     //
     //
-    //     // let next = self
-    //     //     .chainsync
-    //     //     .as_mut()
-    //     //     .unwrap()
-    //     //     .into_request()
-    //     //     .or_restart()?;
-    //     //
-    //     //
-    //     //
-    //     // match next {
-    //     //     chainsync::NextResponse::RollForward(h, t) => {
-    //     //         self.on_roll_forward(h)?;
-    //     //         self.chain_tip.set(t.1 as i64);
-    //     //         Ok(())
-    //     //     }
-    //     //     chainsync::NextResponse::RollBackward(p, t) => {
-    //     //         self.on_rollback(&p)?;
-    //     //         self.chain_tip.set(t.1 as i64);
-    //     //         Ok(())
-    //     //     }
-    //     //     chainsync::NextResponse::Await => {
-    //     //         log::info!("chain-sync reached the tip of the chain");
-    //     //         Ok(())
-    //     //     }
-    //     // }
+    //
+    //     match next {
+    //         chainsync::NextResponse::RollForward(h, t) => {
+    //             self.on_roll_forward(h)?;
+    //             self.chain_tip.set(t.1 as i64);
+    //             Ok(())
+    //         }
+    //         chainsync::NextResponse::RollBackward(p, t) => {
+    //             self.on_rollback(&p, t.0)?;
+    //             self.chain_tip.set(t.1 as i64);
+    //             Ok(())
+    //         }
+    //         chainsync::NextResponse::Await => {
+    //             log::info!("chain-sync reached the tip of the chain");
+    //             Ok(())
+    //         }
+    //     }
     // }
-
+    //
     // fn await_next(&mut self) -> Result<(), gasket::error::Error> {
     //     log::info!("awaiting next block (blocking)");
     //
@@ -164,7 +180,7 @@ impl gasket::runtime::Worker for Worker {
 
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
         let transport = Transport::setup(&self.address).unwrap();
-        self.chainsync = Some(transport.channel7);
+        self.chainsync = Some(transport.channel6);
         Ok(())
     }
 
