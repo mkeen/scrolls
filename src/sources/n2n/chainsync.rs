@@ -11,7 +11,7 @@ use crate::{crosscut, model, sources::utils, storage, Error};
 use std::vec::Vec;
 use pallas::codec::minicbor::bytes::nil;
 use pallas::codec::minicbor::Encode;
-use pallas::network::miniprotocols::blockfetch::Range;
+use pallas::network::miniprotocols::blockfetch::{Body, Range};
 
 use crate::prelude::*;
 
@@ -96,24 +96,21 @@ impl Worker {
     fn on_rollback(&mut self, point: &Point, tip: &Point) -> Result<(), gasket::error::Error> {
         log::debug!("rolling block to point {:?}", point);
 
-        if !tip.is_nil() {
-            log::debug!("fetching blocks to revert");
-            let blocks_to_revert = self
-                .blockfetch
-                .as_mut()
-                .unwrap()
-                .fetch_range(Range::from((point.clone(), tip.clone())))
-                .or_restart()
-                .unwrap();
-
-            log::warn!("reverting {} blocks", blocks_to_revert.len());
-
-            for block in blocks_to_revert.iter() {
-                log::debug!("rolling back block at {:?}", point);
-                self.output.send(model::RawBlockPayload::roll_back(point.clone(), block.clone()))?;
+        log::debug!("fetching blocks to revert");
+        match self.blockfetch
+            .as_mut()
+            .unwrap()
+            .fetch_range(Range::from((point.clone(), tip.clone())))
+            .or_restart() {
+            Ok(found_blocks) => {
+                log::warn!("reverting {} blocks", found_blocks.len());
+                for block in found_blocks.iter() {
+                    log::debug!("rolling back block at {:?}", point);
+                    self.output.send(model::RawBlockPayload::roll_back(point.clone(), block.clone()))?;
+                }
             }
-
-        }
+            Err(_) => {}
+        };
 
         match self.chain_buffer.roll_back(point) {
             chainsync::RollbackEffect::Handled => {
