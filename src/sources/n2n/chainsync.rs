@@ -68,7 +68,6 @@ impl Worker {
             chain_tip: Default::default(),
             chain_buffer: chainsync::RollbackBuffer::new(),
         }
-
     }
 
     fn on_roll_forward(
@@ -105,7 +104,7 @@ impl Worker {
                 .unwrap()
                 .fetch_range(Range::from((point.clone(), tip.clone())))
                 .or_restart()
-                .unwrap_or();
+                .unwrap();
 
             log::warn!("reverting {} blocks", blocks_to_revert.len());
 
