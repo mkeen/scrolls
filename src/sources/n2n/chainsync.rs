@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use pallas::ledger::traverse::MultiEraHeader;
 use pallas::network::miniprotocols::chainsync::HeaderContent;
 use pallas::network::miniprotocols::{blockfetch, chainsync, Point};
@@ -8,10 +7,6 @@ use pallas::network::multiplexer::StdChannel;
 
 use crate::sources::n2n::transport::Transport;
 use crate::{crosscut, model, sources::utils, storage, Error};
-use std::vec::Vec;
-use pallas::codec::minicbor::bytes::nil;
-use pallas::codec::minicbor::Encode;
-use pallas::network::miniprotocols::blockfetch::{Body, Range};
 
 use crate::prelude::*;
 
@@ -21,7 +16,7 @@ fn to_traverse<'b>(header: &'b HeaderContent) -> Result<MultiEraHeader<'b>, Erro
         header.byron_prefix.map(|x| x.0),
         &header.cbor,
     )
-    .map_err(Error::cbor)
+        .map_err(Error::cbor)
 }
 
 pub type OutputPort = gasket::messaging::OutputPort<model::RawBlockPayload>;
@@ -93,36 +88,22 @@ impl Worker {
         Ok(())
     }
 
-    fn on_rollback(&mut self, point: &Point, tip: &Point) -> Result<(), gasket::error::Error> {
+    fn on_rollback(&mut self, point: &Point) -> Result<(), gasket::error::Error> {
         log::debug!("rolling block to point {:?}", point);
 
-        log::debug!("fetching blocks to revert");
-        match self.blockfetch
-            .as_mut()
-            .unwrap()
-            .fetch_range(Range::from((point.clone(), tip.clone())))
-            .or_restart() {
-            Ok(found_blocks) => {
-                log::warn!("reverting {} blocks", found_blocks.len());
-                for block in found_blocks.iter() {
-                    log::debug!("rolling back block at {:?}", point);
-                    self.output.send(model::RawBlockPayload::roll_back(point.clone(), block.clone()))?;
-                }
+        match self.chain_buffer.position(point) {
+            None => {
+                log::debug!("rollback out of buffer scope, THIS SHOULD NOT HAPPEN...");
             }
-            Err(_) => {}
-        };
-
-        match self.chain_buffer.roll_back(point) {
-            chainsync::RollbackEffect::Handled => {
-                log::debug!("handled rollback within buffer {:?}", point);
-            }
-
-            chainsync::RollbackEffect::OutOfScope => {
-                // todo, it is possible we might want to do something here.. maybe.
-                log::debug!("rollback out of buffer scope, sending event down the pipeline");
+            Some(buffer_index) => {
+                let blocks = self.chain_buffer.pop_with_depth(buffer_index);
             }
 
         }
+
+        self.chain_buffer.roll_back(point);
+        self.output
+            .send(model::RawBlockPayload::roll_back(vec![]))?;
 
         Ok(())
     }
@@ -144,7 +125,7 @@ impl Worker {
                 Ok(())
             }
             chainsync::NextResponse::RollBackward(p, t) => {
-                self.on_rollback(&p, &t.0)?;
+                self.on_rollback(&p)?;
                 self.chain_tip.set(t.1 as i64);
                 Ok(())
             }
@@ -172,7 +153,7 @@ impl Worker {
                 Ok(())
             }
             chainsync::NextResponse::RollBackward(p, t) => {
-                self.on_rollback(&p, &t.0)?;
+                self.on_rollback(&p)?;
                 self.chain_tip.set(t.1 as i64);
                 Ok(())
             }

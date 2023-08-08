@@ -11,7 +11,7 @@ use crate::prelude::*;
 #[derive(Debug, Clone)]
 pub enum RawBlockPayload {
     RollForward(Vec<u8>),
-    RollBack(Point, Vec<u8>),
+    RollBack(Vec<Vec<u8>>),
 }
 
 impl RawBlockPayload {
@@ -21,9 +21,9 @@ impl RawBlockPayload {
         }
     }
 
-    pub fn roll_back(point: Point, block: Vec<u8>) -> gasket::messaging::Message<Self> {
+    pub fn roll_back(blocks: Vec<Vec<u8>>) -> gasket::messaging::Message<Self> {
         gasket::messaging::Message {
-            payload: Self::RollBack(point, block),
+            payload: Self::RollBack(blocks),
         }
     }
 }
@@ -74,7 +74,7 @@ impl BlockContext {
 #[derive(Debug, Clone)]
 pub enum EnrichedBlockPayload {
     RollForward(Vec<u8>, BlockContext),
-    RollBack(Point, Vec<u8>, BlockContext),
+    RollBack(Point),
 }
 
 impl EnrichedBlockPayload {
@@ -84,9 +84,9 @@ impl EnrichedBlockPayload {
         }
     }
 
-    pub fn roll_back(point: Point, block: Vec<u8>, ctx: BlockContext) -> gasket::messaging::Message<Self> {
+    pub fn roll_back(point: Point) -> gasket::messaging::Message<Self> {
         gasket::messaging::Message {
-            payload: Self::RollBack(point, block, ctx),
+            payload: Self::RollBack(point),
         }
     }
 }

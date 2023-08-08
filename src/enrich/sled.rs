@@ -12,6 +12,7 @@ use pallas::{
     ledger::traverse::{Era, MultiEraBlock, MultiEraTx, OutputRef},
 };
 use pallas::codec::minicbor::bytes::nil;
+use pallas::network::miniprotocols::chainsync::RollbackBuffer;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 use sled::{Batch, IVec};
@@ -298,7 +299,6 @@ impl gasket::runtime::Worker for Worker {
                     None => return Ok(gasket::runtime::WorkOutcome::Partial),
                 };
 
-
                 let txs = block.txs();
 
                 // first we insert new utxo produced in this block
@@ -315,23 +315,25 @@ impl gasket::runtime::Worker for Worker {
 
                 self.blocks_counter.inc(1);
             }
-            model::RawBlockPayload::RollBack(x, cbor) => {
-                let block = MultiEraBlock::decode(&cbor)
-                    .map_err(crate::Error::cbor)
-                    .apply_policy(&self.policy)
-                    .or_panic().unwrap();
+            model::RawBlockPayload::RollBack(cbor_list) => {
+                for cbor in cbor_list {
+                    let block = MultiEraBlock::decode(&cbor)
+                        .map_err(crate::Error::cbor)
+                        .apply_policy(&self.policy)
+                        .or_panic().unwrap();
 
-                match block {
-                    None => {}
-                    Some(block) => {
-                        let ctx = self.par_fetch_referenced_utxos(db, &block.txs()).or_restart()?;
-                        self.restore_consumed_utxos(&db, &restoration_db, &block.txs()).unwrap();
-                        self.output
-                            .send(model::EnrichedBlockPayload::roll_forward(cbor, ctx))?;
+                    match block {
+                        None => {}
+                        Some(block) => {
+                            let ctx = self.par_fetch_referenced_utxos(db, &block.txs()).or_restart()?;
+                            self.restore_consumed_utxos(&db, &restoration_db, &block.txs()).unwrap();
+                            self.output
+                                .send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
+                        }
+
                     }
 
                 }
-
 
             }
 
@@ -340,6 +342,8 @@ impl gasket::runtime::Worker for Worker {
         self.input.commit();
         Ok(WorkOutcome::Partial)
     }
+
+    fn
 
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
         let db = sled::open(&self.config.db_path).or_retry()?;
