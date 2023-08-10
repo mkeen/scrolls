@@ -355,7 +355,7 @@ impl gasket::runtime::Worker for Worker {
                 self.blocks_counter.inc(1);
             }
             model::RawBlockPayload::RollBack(last_valid, revert_blocks) => {
-                warn!("rolling back decor {}", last_valid.len(), revert_blocks.len());
+                warn!("rolling back decor {} {}", last_valid.len(), revert_blocks.len());
                 let mut ctx: Vec<BlockContext> = vec![];
 
                 for cbor in revert_blocks.iter().rev() {
