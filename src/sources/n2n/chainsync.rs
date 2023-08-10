@@ -218,6 +218,8 @@ impl gasket::runtime::Worker for Worker {
                 .fetch_single(point.clone())
                 .or_restart()?;
 
+            self.blocks.insert_block(point.slot_or_default(), block);
+
             self.output
                 .send(model::RawBlockPayload::roll_forward(block))?;
 

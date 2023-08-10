@@ -78,7 +78,7 @@ impl Worker {
 
         let point = Point::Specific(block.slot(), block.hash().to_vec());
 
-        self.blocks.insert_block(content.to_vec(), block);
+        self.blocks.insert_block(point, content.to_vec());
 
         // track the new point in our memory buffer
         log::debug!("rolling forward to point {:?}", point);
