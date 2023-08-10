@@ -362,6 +362,7 @@ impl gasket::runtime::Worker for Worker {
                     warn!("trying to decode {}", cbor.len());
 
                     if cbor.is_empty() {
+                        warn!("skipping empty cbor {}", cbor.len());
                         continue
                     }
 
