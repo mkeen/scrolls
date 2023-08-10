@@ -5,7 +5,7 @@ use gasket::{
     runtime::{spawn_stage, WorkOutcome},
 };
 use gasket::error::Error;
-use log::error;
+use log::{error, warn};
 
 use pallas::{
     codec::minicbor,
@@ -326,6 +326,8 @@ impl gasket::runtime::Worker for Worker {
 
         match msg.payload {
             model::RawBlockPayload::RollForward(cbor) => {
+                warn!("rolling forward {}", cbor.len());
+
                 let block = MultiEraBlock::decode(&cbor)
                     .map_err(crate::Error::cbor)
                     .apply_policy(&self.policy)
@@ -353,6 +355,7 @@ impl gasket::runtime::Worker for Worker {
                 self.blocks_counter.inc(1);
             }
             model::RawBlockPayload::RollBack(last_valid, revert_blocks) => {
+                warn!("rolling back decor {}", last_valid.len(), revert_blocks.len());
                 let mut ctx: Vec<BlockContext> = vec![];
 
                 for cbor in revert_blocks.iter().rev() {
