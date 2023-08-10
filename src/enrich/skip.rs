@@ -67,7 +67,7 @@ impl gasket::runtime::Worker for Worker {
 
         match msg.payload {
             model::RawBlockPayload::RollForward(cbor) => {
-                warn!("rollfwd {}", cbor.len())
+                warn!("rollfwd {}", cbor.len());
                 self.output.send(model::EnrichedBlockPayload::roll_forward(
                     cbor,
                     BlockContext::default(),
