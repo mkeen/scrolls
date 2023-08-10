@@ -78,7 +78,7 @@ impl RollbackData {
                 match last_valid_block.clone() {
                     None => {log::warn!("END BLOCKING {} {}", blocks_to_roll_back.len(), "!!")}
                     Some(last_valid_block) => {
-                        log::warn!("END BLOCKING {} {}", blocks_to_roll_back.len(), last_valid_block.len());
+                        log::warn!("END BLOCKING {} {} *{}", blocks_to_roll_back.len(), last_valid_block.len(), slot);
 
                     }
                 }
