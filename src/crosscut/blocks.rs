@@ -69,6 +69,8 @@ impl RollbackData {
                     Some(value) => value.to_vec()
                 };
 
+                error!("wwioefjwoeufhw {}", current_block.len());
+
                 blocks_to_roll_back.push(current_block.to_vec());
 
                 let mut last_sibling_found = slot.clone().to_string();
