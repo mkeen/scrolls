@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use log::{debug, error, info};
 use pallas::codec::minicbor::bytes::nil;
 use pallas::ledger::traverse::MultiEraBlock;
@@ -80,18 +81,22 @@ impl Worker {
             .apply_policy(&self.policy)
             .or_panic();
 
-        if let Ok(last_valid_block) = last_valid_block.as_ref() {
-            if let Some(last_valid_block) = last_valid_block {
-                self.last_block.set(last_valid_block.number() as i64);
+        let reversed_blocks = blocks.iter().rev();
 
-                self.output.send(gasket::messaging::Message::from(
-                    model::CRDTCommand::block_starting(last_valid_block),
-                ))?;
-            }
+        let mut reversed_contexts = ctx.clone();
+        reversed_contexts.reverse();
+
+        if let Ok(Some(last_valid_block)) = last_valid_block.as_ref() {
+            self.last_block.set(last_valid_block.number() as i64);
+
+            self.output.send(gasket::messaging::Message::from(
+                model::CRDTCommand::block_starting(last_valid_block),
+            ))?;
         }
 
-        for (k, block) in blocks.iter().enumerate().rev() {
+        for (k, block) in reversed_blocks.enumerate() {
             debug!("trying to roll back {}", block.len());
+            let cbor_block = block.clone();
 
             let block = MultiEraBlock::decode(block)
                 .map_err(crate::Error::cbor)
@@ -105,10 +110,7 @@ impl Worker {
 
                 let default_context = BlockContext::default();
 
-                let mut to_reverse = ctx.clone();
-                to_reverse.reverse();
-
-                let context = match to_reverse.get(k) {
+                let context = match reversed_contexts.get(k) {
                     None => &default_context,
                     Some(context) => context
                 };
@@ -120,12 +122,10 @@ impl Worker {
             }
         }
 
-        if let Ok(last_valid_block) = last_valid_block.as_ref() {
-            if let Some(last_valid_block) = last_valid_block {
-                self.output.send(gasket::messaging::Message::from(
-                    model::CRDTCommand::block_finished(last_valid_block),
-                ))?;
-            }
+        if let Ok(Some(last_valid_block)) = last_valid_block.as_ref() {
+            self.output.send(gasket::messaging::Message::from(
+                model::CRDTCommand::block_finished(last_valid_block),
+            ))?;
         }
 
         Ok(())
@@ -150,9 +150,7 @@ impl gasket::runtime::Worker for Worker {
             }
             model::EnrichedBlockPayload::RollBack(last_valid_block, blocks_to_rollback, contexts) => {
                 error!("starting to attempt a rollback {} {} {}", last_valid_block.len(), blocks_to_rollback.len(), contexts.len());
-                if !blocks_to_rollback.is_empty() {
-                    self.reduce_rollback_blocks(&last_valid_block, &blocks_to_rollback, &contexts)?;
-                }
+                self.reduce_rollback_blocks(&last_valid_block, &blocks_to_rollback, &contexts)?;
             }
         }
 

@@ -367,7 +367,6 @@ impl gasket::runtime::Worker for Worker {
                 let mut ctx: Vec<BlockContext> = vec![];
 
                 for cbor in revert_blocks.iter().rev() {
-
                     if cbor.is_empty() {
                         continue
                     }

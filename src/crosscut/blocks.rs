@@ -65,17 +65,9 @@ impl RollbackData {
 
                 let mut last_sibling_found = slot.clone().to_string();
 
-                log::warn!("START BLOCKING");
                 while let Some((current_slot, current_block)) = db.get_gt(last_sibling_found.to_string().as_bytes()).unwrap() {
                     last_sibling_found = std::str::from_utf8(&current_slot).unwrap().to_string();
                     blocks_to_roll_back.push(current_block.to_vec())
-                }
-
-                match last_valid_block.clone() {
-                    None => {log::warn!("END BLOCKING {} {} *{}", blocks_to_roll_back.len(), slot, "!!")}
-                    Some(last_valid_block) => {
-                        log::warn!("END BLOCKING {} {} *{}", blocks_to_roll_back.len(), last_valid_block.len(), slot);
-                    }
                 }
 
                 (last_valid_block, blocks_to_roll_back)
