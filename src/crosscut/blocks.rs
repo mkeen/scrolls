@@ -74,7 +74,7 @@ impl RollbackData {
                     last_sibling_found = std::str::from_utf8(&current_slot.to_vec()).unwrap().to_string();
                     blocks_to_roll_back.push(current_block.to_vec())
                 }
-                log::warn!("END BLOCKING {} {}", blocks_to_roll_back.len(), last_valid_block.clone().unwrap().len());
+                log::warn!("END BLOCKING {} {}", blocks_to_roll_back.len(), last_valid_block.clone().ok_or("").unwrap().len());
 
                 (last_valid_block, blocks_to_roll_back)
             }
@@ -82,9 +82,9 @@ impl RollbackData {
     }
 
     pub fn insert_block(&self, point: &Point, block: &Vec<u8>) {
-        let key = point.slot_or_default().to_string();
+        let key = point.slot_or_default();
         let db = self.get_db_ref();
-        db.insert(key.as_bytes(), IVec::from(block.clone())).unwrap();
+        db.insert(key.to_string().as_bytes(), IVec::from(block.clone()));
 
         let current_len = db.len();
 
