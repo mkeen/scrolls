@@ -96,10 +96,10 @@ impl Worker {
 
         match self.chain_buffer.roll_back(point) {
             chainsync::RollbackEffect::Handled => {
-                log::debug!("handled rollback within buffer {:?}", point);
+                log::warn!("handled rollback within buffer {:?}", point);
             }
             chainsync::RollbackEffect::OutOfScope => {
-                log::debug!("fetching block from ring buffer");
+                log::warn!("fetching block from ring buffer");
                 let (last_valid, blocks) = self.blocks.get_rollback_range(point.clone());
 
                 self.output
