@@ -58,6 +58,10 @@ impl Reducer {
         rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
+        if rollback {
+            return Ok(());
+        }
+
         for tx in block.txs().into_iter() {
             if let Some(mints) = tx.mint().as_alonzo() {
                 for (policy, assets) in mints.iter() {

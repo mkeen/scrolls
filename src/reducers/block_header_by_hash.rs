@@ -23,6 +23,10 @@ impl Reducer {
         rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
+        if rollback {
+            return Ok(());
+        }
+
         if filter_matches_block!(self, block, ctx) {
             let value = block
                 .header()

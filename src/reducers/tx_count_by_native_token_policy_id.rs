@@ -51,6 +51,10 @@ impl Reducer {
         rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
+        if rollback {
+            return Ok(());
+        }
+
         if block.era().has_feature(Feature::MultiAssets) {
 
             let epoch_no = block_epoch(&self.chain, block);

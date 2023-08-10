@@ -64,6 +64,10 @@ impl Reducer {
         rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
+        if rollback {
+            return Ok(());
+        }
+
         for tx in &block.txs() {
             if filter_matches!(self, block, &tx, ctx) {
                 self.send(block, tx, output)?;

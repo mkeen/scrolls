@@ -136,6 +136,10 @@ impl Reducer {
         rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
+        if rollback {
+            return Ok(());
+        }
+
         for tx in block.txs().into_iter() {
             if filter_matches!(self, block, &tx, ctx) {
                 let epoch_no = block_epoch(&self.chain, block);

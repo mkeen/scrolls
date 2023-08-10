@@ -59,6 +59,10 @@ impl Reducer {
         rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
+        if rollback {
+            return Ok(());
+        }
+
         for tx in block.txs().into_iter() {
             for (tx_ref, tx_output) in ctx.find_consumed_txos(&tx, &self.policy).or_panic()? {
                 for asset in tx_output.assets() {

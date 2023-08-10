@@ -71,6 +71,10 @@ impl Reducer {
         rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
+        if rollback {
+            return Ok(());
+        }
+
         for tx in block.txs().iter() {
             for (_, txo) in tx.produces() {
                 self.process_txo(&txo, output)?;

@@ -67,6 +67,10 @@ impl Reducer {
         rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
+        if rollback {
+            return Ok(());
+        }
+
         for tx in block.txs().into_iter() {
             for (idx, produced) in tx.produces() {
                 let address = produced.address().or_panic()?;
