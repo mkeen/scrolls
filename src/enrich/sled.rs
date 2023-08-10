@@ -400,14 +400,6 @@ impl gasket::runtime::Worker for Worker {
     }
 
     fn teardown(&mut self) -> Result<(), gasket::error::Error> {
-        match &self.db {
-            Some(db) => {
-                db.flush().or_panic()?;
-                Ok(())
-            }
-            None => Ok(()),
-        }?;
-
         match &self.produced_ring {
             Some(tree) => {
                 tree.flush().or_panic()?;
@@ -419,6 +411,14 @@ impl gasket::runtime::Worker for Worker {
         match &self.consumed_ring {
             Some(tree) => {
                 tree.flush().or_panic()?;
+                Ok(())
+            }
+            None => Ok(()),
+        }?;
+
+        match &self.db {
+            Some(db) => {
+                db.flush().or_panic()?;
                 Ok(())
             }
             None => Ok(()),
