@@ -95,23 +95,30 @@ impl Worker {
     fn on_rollback(&mut self, point: &Point) -> Result<(), gasket::error::Error> {
         log::debug!("rolling block to point {:?}", point);
 
+        match point {
+            Point::Origin => {}
+            Point::Specific(_, _) => {}
+        }
+
         match self.chain_buffer.roll_back(point) {
             chainsync::RollbackEffect::Handled => {
                 log::warn!("handled rollback within buffer {:?}", point);
+                Ok(())
             }
             chainsync::RollbackEffect::OutOfScope => {
-                log::warn!("fetching block from ring buffer");
                 let (last_valid, blocks) = self.blocks.get_rollback_range(point.clone());
 
                 if let Some(last_valid) = last_valid {
                     if !blocks.is_empty() {
                         self.output.send(model::RawBlockPayload::roll_back(last_valid, blocks))?;
                     }
+                } else {
+                    log::warn!("skipped rollback, blocks are unknown {:?}", point);
                 }
+
+                Ok(())
             }
         }
-
-        Ok(())
     }
 
     fn request_next(&mut self) -> Result<(), gasket::error::Error> {
