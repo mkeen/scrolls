@@ -87,7 +87,7 @@ impl Worker {
                 model::CRDTCommand::block_starting(&last_valid_block),
             ))?;
 
-            for (k, block) in blocks.iter().enumerate() {
+            for (k, block) in blocks.iter().enumerate().rev() {
                 let block = MultiEraBlock::decode(block)
                     .map_err(crate::Error::cbor)
                     .apply_policy(&self.policy)
@@ -100,7 +100,10 @@ impl Worker {
 
                 let default_context = BlockContext::default();
 
-                let context = match ctx.get(k) {
+                let mut to_reverse = ctx.clone();
+                to_reverse.reverse();
+
+                let context = match to_reverse.get(k) {
                     None => &default_context,
                     Some(context) => context
                 };
