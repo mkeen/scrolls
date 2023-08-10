@@ -13,7 +13,7 @@ use pallas::{
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
-use sled::{IVec};
+use sled::{Batch, IVec};
 
 use crate::{
     bootstrap, crosscut,
@@ -162,6 +162,23 @@ impl Worker {
 
         produced_ring.apply_batch(rollback_insert_batch)
             .map_err(crate::Error::storage)?;
+
+        // Clean up produced_ring
+        let produced_ring_len = produced_ring.len();
+        if produced_ring_len > 100000 {
+            let mut cleanup_batch = Batch::default();
+
+            for _ in [..produced_ring_len - 100000] {
+                let first = produced_ring.iter().next();
+                if let Some(first) = first {
+                    if let Ok((trim_key, _)) = first {
+                        cleanup_batch.remove(trim_key);
+                    }
+                }
+            }
+
+            produced_ring.apply_batch(cleanup_batch);
+        }
 
         self.inserts_counter.inc(txs.len() as u64);
 

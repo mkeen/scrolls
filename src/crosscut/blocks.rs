@@ -1,6 +1,4 @@
-use futures::future::err;
 use gasket::error::AsWorkError;
-use log::{error, warn};
 use pallas::ledger::traverse::MultiEraBlock;
 use pallas::network::miniprotocols::Point;
 use sled::{Db, IVec, Tree};
