@@ -95,29 +95,29 @@ impl Worker {
 
             let block = MultiEraBlock::decode(block)
                 .map_err(crate::Error::cbor)
-                .apply_policy(&self.policy)
-                .or_panic()?;
+                .apply_policy(&self.policy);
 
-            let block = match block {
-                Some(x) => x,
-                None => return Ok(()),
-            };
+            if let Ok(block) = block {
+                let block = match block {
+                    Some(x) => x,
+                    None => return Ok(()),
+                };
 
-            let default_context = BlockContext::default();
+                let default_context = BlockContext::default();
 
-            let mut to_reverse = ctx.clone();
-            to_reverse.reverse();
+                let mut to_reverse = ctx.clone();
+                to_reverse.reverse();
 
-            let context = match to_reverse.get(k) {
-                None => &default_context,
-                Some(context) => context
-            };
+                let context = match to_reverse.get(k) {
+                    None => &default_context,
+                    Some(context) => context
+                };
 
-            for reducer in self.reducers.iter_mut() {
-                reducer.reduce_block(&block, context, true, &mut self.output)?;
-                self.ops_count.inc(1);
+                for reducer in self.reducers.iter_mut() {
+                    reducer.reduce_block(&block, context, true, &mut self.output)?;
+                    self.ops_count.inc(1);
+                }
             }
-
         }
 
         if let Ok(last_valid_block) = last_valid_block.as_ref() {
