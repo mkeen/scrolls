@@ -87,10 +87,6 @@ impl Worker {
         reversed_contexts.reverse();
 
         for (k, block) in reversed_blocks.enumerate() {
-            if k == 0 && last_valid_block.is_ok() {
-
-            }
-
             debug!("trying to roll back {}", block.len());
             let cbor_block = block.clone();
 

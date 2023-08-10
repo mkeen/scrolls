@@ -33,7 +33,6 @@ impl ChainSyncInternalPayload {
 #[derive(Deserialize)]
 pub struct Config {
     pub address: String,
-    pub buffer_path: String,
     pub min_depth: Option<usize>,
 }
 
