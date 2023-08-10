@@ -379,6 +379,10 @@ impl gasket::runtime::Worker for Worker {
                     }
                 }
 
+                if ctx.is_empty() {
+                    ctx.push(BlockContext::default());
+                }
+
                 if revert_blocks.len() > 0 {
                     self.output.send(model::EnrichedBlockPayload::roll_back(last_valid, revert_blocks, ctx.into_iter().rev().collect()))?;
                 }
