@@ -74,7 +74,7 @@ impl RollbackData {
                     last_sibling_found = std::str::from_utf8(&current_slot.to_vec()).unwrap().to_string();
                     blocks_to_roll_back.push(current_block.to_vec())
                 }
-                log::warn!("END BLOCKING {}", blocks_to_roll_back.len());
+                log::warn!("END BLOCKING {} {}", blocks_to_roll_back.len(), last_valid_block.len());
 
                 (last_valid_block, blocks_to_roll_back)
             }
