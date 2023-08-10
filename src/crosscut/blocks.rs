@@ -80,7 +80,7 @@ impl RollbackData {
             };
 
             if let Some((first, _)) = first {
-                log::warn!("writing block to slot buffer {}", current_len);
+                log::warn!("removing block from slot buffer {}", current_len);
                 db.remove(first).expect("todo: panic message");
             }
         }
