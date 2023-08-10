@@ -103,9 +103,12 @@ impl Worker {
                 log::warn!("fetching block from ring buffer");
                 let (last_valid, blocks) = self.blocks.get_rollback_range(point.clone());
 
-                if let Some(last_valid) = last_valid {
-                    self.output
-                        .send(model::RawBlockPayload::roll_back(last_valid, blocks))?;
+                if !blocks.is_empty() {
+                    log::warn!("rolling back blocks");
+                    self.output.send(model::RawBlockPayload::roll_back(match last_valid {
+                        None => vec![],
+                        Some(block) => block
+                    }, blocks))?;
                 }
             }
         }
