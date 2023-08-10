@@ -1,6 +1,8 @@
 use std::time::Duration;
+use futures::future::err;
 
 use gasket::runtime::{spawn_stage, WorkOutcome};
+use log::error;
 
 use crate::{
     bootstrap,
@@ -71,6 +73,7 @@ impl gasket::runtime::Worker for Worker {
                 ))?;
             }
             model::RawBlockPayload::RollBack(previous_cbor, revert_cbor_blocks, ) => {
+                error!("i should have known {} {}", previous_cbor.len(), previous_cbor.len())
                 self.output
                     .send(model::EnrichedBlockPayload::roll_back(previous_cbor, revert_cbor_blocks, vec![]))?;
             }

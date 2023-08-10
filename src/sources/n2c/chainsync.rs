@@ -4,6 +4,7 @@ use pallas::network::miniprotocols::chainsync::BlockContent;
 use pallas::network::miniprotocols::{chainsync, Point};
 use pallas::network::multiplexer::StdChannel;
 use std::collections::HashMap;
+use log::error;
 
 use crate::prelude::*;
 use crate::{crosscut, model, sources::utils, storage, Error};
