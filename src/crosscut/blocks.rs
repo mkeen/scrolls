@@ -90,6 +90,7 @@ impl RollbackData {
             }
 
             db.apply_batch(trim_batch);
+            db.flush();
         }
     }
 
