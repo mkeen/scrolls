@@ -78,8 +78,6 @@ impl Worker {
 
         let point = Point::Specific(block.slot(), block.hash().to_vec());
 
-        self.blocks.insert_block(&point, &content.0);
-
         // track the new point in our memory buffer
         log::debug!("rolling forward to point {:?}", point);
         self.chain_buffer.roll_forward(point);
@@ -120,6 +118,7 @@ impl Worker {
 
         match next {
             chainsync::NextResponse::RollForward(h, t) => {
+                self.blocks.insert_block(&t.0, &h.0);
                 self.on_roll_forward(h)?;
                 self.chain_tip.set(t.1 as i64);
                 Ok(())
@@ -148,6 +147,7 @@ impl Worker {
 
         match next {
             chainsync::NextResponse::RollForward(h, t) => {
+                self.blocks.insert_block(&t.0, &h.0);
                 self.on_roll_forward(h)?;
                 self.chain_tip.set(t.1 as i64);
                 Ok(())
@@ -201,12 +201,15 @@ impl gasket::runtime::Worker for Worker {
         // find confirmed block in memory and send down the pipeline
         for point in ready {
             let block = self
-                .blocks.get_block_at_point(point.clone()).unwrap();
+                .blocks.get_block_at_point(&point);
 
-            self.output
-                .send(model::RawBlockPayload::roll_forward(block.into()))?;
-
-            self.block_count.inc(1);
+            if let Some(block) = block {
+                self.output
+                    .send(model::RawBlockPayload::roll_forward(block))?;
+                self.block_count.inc(1);
+            } else {
+                log::warn!("couldn't find block in buffer: {}", &point.slot_or_default())
+            }
 
             // evaluate if we should finalize the thread according to config
             if crosscut::should_finalize(&self.finalize, &point) {
