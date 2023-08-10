@@ -1,5 +1,5 @@
 use gasket::error::AsWorkError;
-use log::warn;
+use log::{error, warn};
 use pallas::ledger::traverse::MultiEraBlock;
 use pallas::network::miniprotocols::Point;
 use sled::{Batch, Db, IVec, Tree};
@@ -62,7 +62,7 @@ impl RollbackData {
         blocks_to_roll_back
     }
 
-    pub fn insert_block(&self, point: &Point, block: &Vec<u8>) {
+    pub fn insert_block(&self, point: &Point, block: &Vec<u8>) -> usize {
         let key = point.slot_or_default();
         let db = self.get_db_ref();
         db.insert(key.to_string().as_bytes(), IVec::from(block.clone()));
@@ -72,26 +72,19 @@ impl RollbackData {
 
         log::warn!("writing block to slot buffer {}", current_len);
 
-
         // Trim excess blocks
         if current_len > 2000000 {
-            for _ in 0..1000 {
-                warn!("trimming db {}", current_len);
-                let first = match db.first() {
-                    Ok(first) => first,
-                    Err(_) => None
-                };
+            let first = match db.first() {
+                Ok(first) => first,
+                Err(_) => None
+            };
 
-                if let Some((first, _)) = first {
-                    trim_batch.remove(first);
-                } else {
-                    break;
-                }
+            if let Some((first, _)) = first {
+                db.remove(first).expect("todo: panic message");
             }
-
-            db.apply_batch(trim_batch);
-            db.flush();
         }
+
+        db.flush().unwrap()
     }
 
     pub fn get_block_at_point(&self, point: &Point) -> Option<Vec<u8>> {
