@@ -49,9 +49,7 @@ impl RollbackData {
 
         let emt: Vec<u8> = Vec::default();
 
-        warn!("hi!!!!! {}", blocks.first().unwrap_or(&emt).len());
-
-        match !blocks.is_empty() {
+        match !blocks.is_empty() && !blocks.first().unwrap_or(&emt).is_empty() {
             false => false,
             true => {
                 self.queue.clear();
