@@ -1,5 +1,5 @@
 use gasket::error::AsWorkError;
-use log::warn;
+use log::{error, warn};
 use pallas::ledger::traverse::MultiEraBlock;
 use pallas::network::miniprotocols::Point;
 use sled::{Db, IVec, Tree};
@@ -51,6 +51,7 @@ impl RollbackData {
 
         match from {
             Point::Origin => {
+                error!("wow, this got me");
                 // Todo map point to well known
                 (None, vec![])
             }
