@@ -82,6 +82,7 @@ impl RollbackData {
     }
 
     pub fn insert_block(&self, point: &Point, block: &Vec<u8>) {
+        warn!("inseting {} {}", point.slot_or_default(), block.len());
         let key = point.slot_or_default().to_string();
         let db = self.get_db_ref();
         db.insert(key.as_bytes(), IVec::from(block.clone())).unwrap();
