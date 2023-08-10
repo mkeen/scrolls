@@ -95,17 +95,13 @@ impl Worker {
     fn on_rollback(&mut self, point: &Point) -> Result<(), gasket::error::Error> {
         log::debug!("rolling block to point {:?}", point);
 
-        match point {
-            Point::Origin => {}
-            Point::Specific(_, _) => {}
-        }
-
         match self.chain_buffer.roll_back(point) {
             chainsync::RollbackEffect::Handled => {
                 log::warn!("handled rollback within buffer {:?}", point);
                 Ok(())
             }
             chainsync::RollbackEffect::OutOfScope => {
+                self.blocks.enqueue_rollback_batch(point);
                 Ok(())
             }
         }
@@ -201,29 +197,35 @@ impl gasket::runtime::Worker for Worker {
             false => self.await_next()?,
         };
 
-        // see if we have points that already reached certain depth
-        let ready = self.chain_buffer.pop_with_depth(self.min_depth);
-        log::debug!("found {} points with required min depth", ready.len());
+        // See if we need to roll back
+        if let Some(block) = self.blocks.rollback_pop() {
+            self.output
+                .send(model::RawBlockPayload::roll_back(block))?;
+        } else {
+            // see if we have points that already reached certain depth
+            let ready = self.chain_buffer.pop_with_depth(self.min_depth);
+            log::debug!("found {} points with required min depth", ready.len());
 
-        // request download of blocks for confirmed points
-        for point in ready {
-            log::warn!("requesting block fetch for point {:?}", point);
+            // request download of blocks for confirmed points
+            for point in ready {
+                log::warn!("requesting block fetch for point {:?}", point);
 
-            let block = self
-                .blockfetch
-                .as_mut()
-                .unwrap()
-                .fetch_single(point.clone())
-                .or_restart()?;
+                let block = self
+                    .blockfetch
+                    .as_mut()
+                    .unwrap()
+                    .fetch_single(point.clone())
+                    .or_restart()?;
 
-            // self.output
-            //     .send(model::RawBlockPayload::roll_forward(block))?;
+                self.output
+                    .send(model::RawBlockPayload::roll_forward(block))?;
 
-            self.block_count.inc(1);
+                self.block_count.inc(1);
 
-            // evaluate if we should finalize the thread according to config
-            if crosscut::should_finalize(&self.finalize, &point) {
-                return Ok(gasket::runtime::WorkOutcome::Done);
+                // evaluate if we should finalize the thread according to config
+                if crosscut::should_finalize(&self.finalize, &point) {
+                    return Ok(gasket::runtime::WorkOutcome::Done);
+                }
             }
         }
 

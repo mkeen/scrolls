@@ -363,45 +363,26 @@ impl gasket::runtime::Worker for Worker {
 
                 self.blocks_counter.inc(1);
             }
-            model::RawBlockPayload::RollBack(revert_blocks) => {
-                let mut ctx: Vec<BlockContext> = vec![];
+            model::RawBlockPayload::RollBack(cbor) => {
+                let block = MultiEraBlock::decode(&cbor)
+                    .map_err(crate::Error::cbor)
+                    .apply_policy(&self.policy)
+                    .or_panic()?;
 
-                for cbor in revert_blocks.iter().rev() {
-                    if cbor.is_empty() {
-                        continue
-                    }
+                let block = match block {
+                    Some(x) => x,
+                    None => return Ok(gasket::runtime::WorkOutcome::Partial),
+                };
 
-                    let block = MultiEraBlock::decode(&cbor)
-                        .map_err(crate::Error::cbor)
-                        .apply_policy(&self.policy)
-                        .or_panic()?;
+                let txs = block.txs();
 
+                // Revert Anything to do with this block
+                self.remove_produced_utxos(db, produced_ring, &txs).expect("todo: panic error");
+                self.replace_consumed_utxos(db, consumed_ring, &txs).expect("todo: panic error");
 
-                    let block = match block {
-                        Some(x) => x,
-                        None => return Ok(gasket::runtime::WorkOutcome::Partial),
-                    };
-
-                    let txs = block.txs();
-
-                    // Revert Anything to do with this block
-                    self.remove_produced_utxos(db, produced_ring, &txs).expect("todo: panic error");
-                    self.replace_consumed_utxos(db, consumed_ring, &txs).expect("todo: panic errpr");
-
-                    if let Ok(current_context) = self.par_fetch_referenced_utxos(db, &txs).or_restart() {
-                        ctx.push(current_context);
-                    } else {
-                        ctx.push(BlockContext::default())
-                    }
-                }
-
-                if ctx.is_empty() {
-                    ctx.push(BlockContext::default());
-                }
-
-                if revert_blocks.len() > 0 {
-                    self.output.send(model::EnrichedBlockPayload::roll_back(revert_blocks, ctx.into_iter().rev().collect()))?;
-                }
+                db.flush().expect("todo: panic error");
+                let ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
+                self.output.send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
             }
         };
 

@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone)]
 pub struct RollbackData {
     db: Option<Db>,
+    queue: Vec<Vec<u8>>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -30,6 +31,7 @@ impl RollbackData {
 
         RollbackData {
             db: Some(db),
+            queue: Vec::default(),
         }
 
     }
@@ -42,7 +44,25 @@ impl RollbackData {
         self.get_db_ref().flush()
     }
 
-    pub fn get_rollback_range(&self, from: Point) -> Vec<Vec<u8>> {
+    pub fn enqueue_rollback_batch(&mut self, from: &Point) -> bool {
+        let blocks = self.get_rollback_range(from);
+
+        match !blocks.is_empty() {
+            false => false,
+            true => {
+                self.queue.clear();
+                self.queue.extend(blocks);
+                true
+            }
+        }
+
+    }
+
+    pub fn rollback_pop(&mut self) -> Option<Vec<u8>> {
+        self.queue.pop()
+    }
+
+    fn get_rollback_range(&self, from: &Point) -> Vec<Vec<u8>> {
         let mut last_valid_block: Option<Vec<u8>> = None;
         let mut current_block: Vec<u8> = vec![];
         let mut blocks_to_roll_back: Vec<Vec<u8>> = vec![];
