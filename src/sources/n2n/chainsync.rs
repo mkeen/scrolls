@@ -73,6 +73,7 @@ impl Worker {
         content: chainsync::HeaderContent,
     ) -> Result<(), gasket::error::Error> {
         // parse the header and extract the point of the chain
+
         let header = to_traverse(&content)
             .apply_policy(&self.policy)
             .or_panic()?;
