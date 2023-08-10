@@ -369,6 +369,8 @@ impl gasket::runtime::Worker for Worker {
                         None => return Ok(gasket::runtime::WorkOutcome::Partial),
                     };
 
+                    warn!("rolling back decor here {} {}", last_valid.len(), revert_blocks.len());
+
                     let txs = block.txs();
 
                     // Revert Anything to do with this block
