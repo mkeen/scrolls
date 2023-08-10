@@ -49,9 +49,10 @@ impl RollbackData {
 
         let db = self.get_db_ref();
 
+        error!("GETTING RANGE CAPTAIN {}", from.slot_or_default());
+
         match from {
             Point::Origin => {
-                error!("wow, this got me");
                 // Todo map point to well known
                 (None, vec![])
             }
