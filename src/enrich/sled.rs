@@ -361,6 +361,9 @@ impl gasket::runtime::Worker for Worker {
                 for cbor in revert_blocks.iter().rev() {
                     warn!("trying to decode {}", cbor.len());
 
+                    if cbor.is_empty() {
+                        continue
+                    }
 
                     let block = MultiEraBlock::decode(&cbor)
                         .map_err(crate::Error::cbor)
