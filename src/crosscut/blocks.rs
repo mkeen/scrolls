@@ -74,7 +74,7 @@ impl RollbackData {
 
 
         // Trim excess blocks
-        if current_len > 10000000 {
+        if current_len > 2000000 {
             let mut db_iter =  db.iter();
             for _ in 0..100 {
                 warn!("trimming db {}", current_len);
