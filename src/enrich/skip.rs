@@ -70,9 +70,9 @@ impl gasket::runtime::Worker for Worker {
                     BlockContext::default(),
                 ))?;
             }
-            model::RawBlockPayload::RollBack(x) => {
+            model::RawBlockPayload::RollBack(previous_cbor, revert_cbor_blocks, ) => {
                 self.output
-                    .send(model::EnrichedBlockPayload::roll_back(x))?;
+                    .send(model::EnrichedBlockPayload::roll_back(previous_cbor, revert_cbor_blocks, vec![]))?;
             }
         };
 

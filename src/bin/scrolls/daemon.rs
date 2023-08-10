@@ -1,7 +1,7 @@
+use std::time::Duration;
 use clap;
 use scrolls::{bootstrap, crosscut, enrich, reducers, sources, storage};
 use serde::Deserialize;
-use std::time::Duration;
 
 use crate::console;
 
@@ -43,6 +43,7 @@ struct ConfigRoot {
     finalize: Option<crosscut::FinalizeConfig>,
     chain: Option<ChainConfig>,
     policy: Option<crosscut::policies::RuntimePolicy>,
+    blocks: Option<crosscut::blocks::RollbackDataConfig>,
 }
 
 impl ConfigRoot {
@@ -106,9 +107,11 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
     let chain = config.chain.unwrap_or_default().into();
     let policy = config.policy.unwrap_or_default().into();
 
+    let blocks = crosscut::blocks::RollbackData::open_db(config.blocks.unwrap_or_default());
+
     let source = config
         .source
-        .bootstrapper(&chain, &config.intersect, &config.finalize, &policy);
+        .bootstrapper(&chain, &blocks, &config.intersect, &config.finalize, &policy);
 
     let enrich = config.enrich.unwrap_or_default().bootstrapper(&policy);
 

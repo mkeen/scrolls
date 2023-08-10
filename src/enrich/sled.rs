@@ -4,6 +4,7 @@ use gasket::{
     error::AsWorkError,
     runtime::{spawn_stage, WorkOutcome},
 };
+use gasket::error::Error;
 
 use pallas::{
     codec::minicbor,
@@ -11,7 +12,7 @@ use pallas::{
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
-use sled::IVec;
+use sled::{IVec};
 
 use crate::{
     bootstrap, crosscut,
@@ -59,6 +60,8 @@ impl Bootstrapper {
             config: self.config,
             policy: self.policy,
             db: None,
+            consumed_ring: None,
+            produced_ring: None,
             input: self.input,
             output: self.output,
             inserts_counter: Default::default(),
@@ -83,6 +86,8 @@ pub struct Worker {
     config: Config,
     policy: crosscut::policies::RuntimePolicy,
     db: Option<sled::Db>,
+    consumed_ring: Option<sled::Tree>,
+    produced_ring: Option<sled::Tree>,
     input: InputPort,
     output: OutputPort,
     inserts_counter: gasket::metrics::Counter,
@@ -134,8 +139,9 @@ fn fetch_referenced_utxo<'a>(
 
 impl Worker {
     #[inline]
-    fn insert_produced_utxos(&self, db: &sled::Db, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
+    fn insert_produced_utxos(&self, db: &sled::Db, produced_ring: &sled::Tree, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
         let mut insert_batch = sled::Batch::default();
+        let mut rollback_insert_batch = sled::Batch::default();
 
         for tx in txs.iter() {
             for (idx, output) in tx.produces() {
@@ -145,6 +151,7 @@ impl Worker {
                 let body = output.encode();
                 let value: IVec = SledTxValue(era, body).try_into()?;
 
+                rollback_insert_batch.insert(key.clone(), IVec::default());
                 insert_batch.insert(key, value)
             }
         }
@@ -152,7 +159,29 @@ impl Worker {
         db.apply_batch(insert_batch)
             .map_err(crate::Error::storage)?;
 
+        produced_ring.apply_batch(rollback_insert_batch)
+            .map_err(crate::Error::storage)?;
+
         self.inserts_counter.inc(txs.len() as u64);
+
+        Ok(())
+    }
+
+    fn remove_produced_utxos(&self, db: &sled::Db, produced_ring: &sled::Tree, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
+        let mut insert_batch = sled::Batch::default();
+        let mut rollback_insert_batch = sled::Batch::default();
+
+        for tx in txs.iter() {
+            for (idx, output) in tx.produces() {
+                rollback_insert_batch.remove(format!("{}#{}", tx.hash(), idx).as_bytes());
+            }
+        }
+
+        db.apply_batch(insert_batch)
+            .map_err(crate::Error::storage)?;
+
+        produced_ring.apply_batch(rollback_insert_batch)
+            .map_err(crate::Error::storage)?;
 
         Ok(())
     }
@@ -188,7 +217,42 @@ impl Worker {
         Ok(ctx)
     }
 
-    fn remove_consumed_utxos(&self, db: &sled::Db, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
+    fn add_removed_to_ring(&self, db: &sled::Db, consumed_ring: &sled::Tree, key: &[u8]) {
+        if let Some(current_value) = db
+            .get(key)
+            .map_err(crate::Error::storage).unwrap()
+        {
+            consumed_ring.insert(key, current_value)
+                .map_err(crate::Error::storage);
+        }
+    }
+
+    fn get_removed_from_ring(&self, consumed_ring: &sled::Tree, key: &[u8]) -> Result<Option<IVec>, crate::Error> {
+        consumed_ring
+            .get(key)
+            .map_err(crate::Error::storage)
+    }
+
+    fn get_key_from_extended_buffer(&self, db: &sled::Db, consumed_ring: &sled::Tree, key: &[u8]) {
+        if let Ok(Some(ivec)) = db
+            .get(key)
+            .map_err(crate::Error::storage)
+        {
+            consumed_ring.insert(key, ivec)
+                .map_err(crate::Error::storage);
+        }
+
+        let ring_len = consumed_ring.len();
+
+        if ring_len > 10000 {
+            for _ in [ring_len - 10000] {
+                consumed_ring.pop_min()
+                    .map_err(crate::Error::storage);
+            }
+        }
+    }
+
+    fn remove_consumed_utxos(&self, db: &sled::Db, consumed_ring: &sled::Tree, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
         let keys: Vec<_> = txs
             .iter()
             .flat_map(|tx| tx.consumes())
@@ -196,11 +260,40 @@ impl Worker {
             .collect();
 
         for key in keys.iter() {
+            self.add_removed_to_ring(db, consumed_ring, key.to_string().as_bytes());
+
             db.remove(key.to_string().as_bytes())
                 .map_err(crate::Error::storage)?;
         }
 
         self.remove_counter.inc(keys.len() as u64);
+
+        Ok(())
+    }
+
+    fn replace_consumed_utxos(&self, db: &sled::Db, consumed_ring: &sled::Tree, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
+        let mut insert_batch = sled::Batch::default();
+
+        let keys: Vec<_> = txs
+            .iter()
+            .flat_map(|tx| tx.consumes())
+            .map(|i| i.output_ref())
+            .collect();
+
+        for key in keys.iter() {
+            if let Ok(existing_value) = self.get_removed_from_ring(consumed_ring, key.to_string().as_bytes()) {
+                if let Some(existing_value) = existing_value {
+                    insert_batch.insert(key.to_string().as_bytes(), existing_value);
+                }
+
+            }
+
+        }
+
+        db.apply_batch(insert_batch)
+            .map_err(crate::Error::storage)?;
+
+        self.inserts_counter.inc(txs.len() as u64);
 
         Ok(())
     }
@@ -220,6 +313,10 @@ impl gasket::runtime::Worker for Worker {
     fn work(&mut self) -> gasket::runtime::WorkResult {
         let msg = self.input.recv_or_idle()?;
 
+        let db = self.db.as_ref().unwrap();
+        let produced_ring = self.produced_ring.as_ref().unwrap();
+        let consumed_ring = self.consumed_ring.as_ref().unwrap();
+
         match msg.payload {
             model::RawBlockPayload::RollForward(cbor) => {
                 let block = MultiEraBlock::decode(&cbor)
@@ -232,27 +329,50 @@ impl gasket::runtime::Worker for Worker {
                     None => return Ok(gasket::runtime::WorkOutcome::Partial),
                 };
 
-                let db = self.db.as_ref().unwrap();
-
                 let txs = block.txs();
 
                 // first we insert new utxo produced in this block
-                self.insert_produced_utxos(db, &txs).or_restart()?;
+                self.insert_produced_utxos(db, produced_ring, &txs).or_restart()?;
 
                 // then we fetch referenced utxo in this block
                 let ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
 
                 // and finally we remove utxos consumed by the block
-                self.remove_consumed_utxos(db, &txs).or_restart()?;
+                self.remove_consumed_utxos(db, consumed_ring, &txs).or_restart()?;
 
                 self.output
                     .send(model::EnrichedBlockPayload::roll_forward(cbor, ctx))?;
 
                 self.blocks_counter.inc(1);
             }
-            model::RawBlockPayload::RollBack(x) => {
-                self.output
-                    .send(model::EnrichedBlockPayload::roll_back(x))?;
+            model::RawBlockPayload::RollBack(last_valid, revert_blocks) => {
+                let mut ctx: Vec<BlockContext> = vec![];
+
+                for cbor in revert_blocks.iter().rev() {
+                    let block = MultiEraBlock::decode(&cbor)
+                        .map_err(crate::Error::cbor)
+                        .apply_policy(&self.policy)
+                        .or_panic()?;
+
+                    let block = match block {
+                        Some(x) => x,
+                        None => return Ok(gasket::runtime::WorkOutcome::Partial),
+                    };
+
+                    let txs = block.txs();
+
+                    // Revert Anything to do with this block
+                    self.remove_produced_utxos(db, produced_ring, &txs);
+                    self.replace_consumed_utxos(db, consumed_ring, &txs);
+
+                    if let Ok(current_context) = self.par_fetch_referenced_utxos(db, &txs).or_restart() {
+                        ctx.push(current_context);
+                    } else {
+                        ctx.push(BlockContext::default())
+                    }
+                }
+
+                self.output.send(model::EnrichedBlockPayload::roll_back(last_valid, revert_blocks, ctx.into_iter().rev().collect()))?;
             }
         };
 
@@ -263,6 +383,8 @@ impl gasket::runtime::Worker for Worker {
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
         let db = sled::open(&self.config.db_path).or_retry()?;
         self.db = Some(db);
+        self.consumed_ring = Some(self.db.as_ref().unwrap().open_tree("consumed_ring").unwrap());
+        self.produced_ring = Some(self.db.as_ref().unwrap().open_tree("produced_ring").unwrap());
 
         Ok(())
     }
@@ -271,6 +393,22 @@ impl gasket::runtime::Worker for Worker {
         match &self.db {
             Some(db) => {
                 db.flush().or_panic()?;
+                Ok(())
+            }
+            None => Ok(()),
+        }?;
+
+        match &self.produced_ring {
+            Some(tree) => {
+                tree.flush().or_panic()?;
+                Ok(())
+            }
+            None => Ok(()),
+        }?;
+
+        match &self.consumed_ring {
+            Some(tree) => {
+                tree.flush().or_panic()?;
                 Ok(())
             }
             None => Ok(()),

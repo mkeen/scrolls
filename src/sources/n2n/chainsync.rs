@@ -4,6 +4,7 @@ use pallas::network::miniprotocols::{blockfetch, chainsync, Point};
 
 use gasket::error::AsWorkError;
 use pallas::network::multiplexer::StdChannel;
+use sled_extensions::Db;
 
 use crate::sources::n2n::transport::Transport;
 use crate::{crosscut, model, sources::utils, storage, Error};
@@ -27,6 +28,7 @@ pub struct Worker {
     policy: crosscut::policies::RuntimePolicy,
     chain_buffer: chainsync::RollbackBuffer,
     chain: crosscut::ChainWellKnownInfo,
+    blocks: crosscut::blocks::RollbackData,
     intersect: crosscut::IntersectConfig,
     cursor: storage::Cursor,
     finalize: Option<crosscut::FinalizeConfig>,
@@ -43,6 +45,7 @@ impl Worker {
         min_depth: usize,
         policy: crosscut::policies::RuntimePolicy,
         chain: crosscut::ChainWellKnownInfo,
+        blocks: crosscut::blocks::RollbackData,
         intersect: crosscut::IntersectConfig,
         finalize: Option<crosscut::FinalizeConfig>,
         cursor: storage::Cursor,
@@ -53,6 +56,7 @@ impl Worker {
             min_depth,
             policy,
             chain,
+            blocks,
             intersect,
             finalize,
             cursor,
@@ -96,9 +100,14 @@ impl Worker {
                 log::debug!("handled rollback within buffer {:?}", point);
             }
             chainsync::RollbackEffect::OutOfScope => {
-                log::debug!("rollback out of buffer scope, sending event down the pipeline");
+                log::debug!("fetching block from ring buffer");
+                let (last_valid, blocks) = self.blocks.get_rollback_range(point.clone());
+
                 self.output
-                    .send(model::RawBlockPayload::roll_back(point.clone()))?;
+                    .send(model::RawBlockPayload::roll_back(match last_valid {
+                        None => vec![],
+                        Some(block) => block
+                    }, blocks))?;
             }
         }
 
