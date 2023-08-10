@@ -73,7 +73,7 @@ impl gasket::runtime::Worker for Worker {
                 ))?;
             }
             model::RawBlockPayload::RollBack(previous_cbor, revert_cbor_blocks, ) => {
-                error!("i should have known {} {}", previous_cbor.len(), previous_cbor.len())
+                error!("i should have known {} {}", previous_cbor.len(), previous_cbor.len());
                 self.output
                     .send(model::EnrichedBlockPayload::roll_back(previous_cbor, revert_cbor_blocks, vec![]))?;
             }
