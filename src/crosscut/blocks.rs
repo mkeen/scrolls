@@ -1,7 +1,7 @@
 use gasket::error::AsWorkError;
 use pallas::ledger::traverse::MultiEraBlock;
 use pallas::network::miniprotocols::Point;
-use sled::{Db, IVec, Tree};
+use sled::{Batch, Db, IVec, Tree};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
@@ -88,14 +88,23 @@ impl RollbackData {
         let db = self.get_db_ref();
         db.insert(key.to_string().as_bytes(), IVec::from(block.clone()));
 
-        let current_len = db.len();
+        let current_len = db.size_on_disk().unwrap();
+        let mut trim_batch = Batch::default();
 
         // Trim excess blocks
-        if current_len > 1000 {
-            for _ in [0..(current_len - 1000)] {
-                let (trim_key, _) = db.iter().next().unwrap().unwrap();
-                db.remove(trim_key).unwrap();
+        if current_len > 10000000 {
+            let mut db_iter =  db.iter();
+            for _ in [0..100] {
+                match db_iter.next() {
+                    None => break,
+                    Some(iter_res) => match iter_res {
+                        Ok((trim_key, _)) => trim_batch.remove(trim_key),
+                        Err(_) => break
+                    }
+                }
             }
+
+            db.apply_batch(trim_batch);
         }
     }
 
