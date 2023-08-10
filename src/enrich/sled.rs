@@ -141,6 +141,7 @@ fn fetch_referenced_utxo<'a>(
 impl Worker {
     #[inline]
     fn insert_produced_utxos(&self, db: &sled::Db, produced_ring: &sled::Tree, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
+        error!("inserting produced utxos");
         let mut insert_batch = sled::Batch::default();
         let mut rollback_insert_batch = sled::Batch::default();
 
@@ -169,6 +170,8 @@ impl Worker {
     }
 
     fn remove_produced_utxos(&self, db: &sled::Db, produced_ring: &sled::Tree, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
+        error!("rolling back produced utxos");
+
         let mut insert_batch = sled::Batch::default();
         let mut rollback_insert_batch = sled::Batch::default();
 
@@ -193,6 +196,9 @@ impl Worker {
         db: &sled::Db,
         txs: &[MultiEraTx],
     ) -> Result<BlockContext, crate::Error> {
+        error!("fetching referenced utxos");
+
+
         let mut ctx = BlockContext::default();
 
         let required: Vec<_> = txs
