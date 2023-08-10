@@ -128,6 +128,8 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
         std::thread::sleep(Duration::from_millis(1500));
     }
 
+    blocks.close();
+
     log::info!("Scrolls is stopping...");
 
     shutdown(pipeline);

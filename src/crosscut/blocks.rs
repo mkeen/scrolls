@@ -36,6 +36,11 @@ impl RollbackData {
 
     }
 
+    pub fn close(&self) {
+        self.block_tree.flush();
+        self.db.flush();
+    }
+
     pub fn get_rollback_range(&self, from: Point) -> (Option<Vec<u8>>, Vec<Vec<u8>>) {
         let mut last_valid_block: Option<Vec<u8>> = None;
         let mut current_block: Vec<u8> = vec![];
