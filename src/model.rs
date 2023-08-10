@@ -21,9 +21,9 @@ impl RawBlockPayload {
         }
     }
 
-    pub fn roll_back(revert_blocks: Vec<Vec<u8>>) -> gasket::messaging::Message<Self> {
+    pub fn roll_back(point: Point) -> gasket::messaging::Message<Self> {
         gasket::messaging::Message {
-            payload: Self::RollBack(revert_blocks),
+            payload: Self::RollBack(blocks),
         }
     }
 }

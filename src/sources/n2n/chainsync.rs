@@ -106,14 +106,7 @@ impl Worker {
                 Ok(())
             }
             chainsync::RollbackEffect::OutOfScope => {
-                let blocks = self.blocks.get_rollback_range(point.clone());
-
-                if !blocks.is_empty() {
-                    self.output.send(model::RawBlockPayload::roll_back(blocks))?;
-                } else {
-                    log::warn!("skipped rollback, blocks are unknown {:?}", point);
-                }
-
+                self.output.send(model::RawBlockPayload::roll_back(point))?;
                 Ok(())
             }
         }
@@ -215,7 +208,7 @@ impl gasket::runtime::Worker for Worker {
 
         // request download of blocks for confirmed points
         for point in ready {
-            log::debug!("requesting block fetch for point {:?}", point);
+            log::warn!("requesting block fetch for point {:?}", point);
 
             let block = self
                 .blockfetch
@@ -223,8 +216,6 @@ impl gasket::runtime::Worker for Worker {
                 .unwrap()
                 .fetch_single(point.clone())
                 .or_restart()?;
-
-            self.blocks.insert_block(&point, &block);
 
             self.output
                 .send(model::RawBlockPayload::roll_forward(block))?;
