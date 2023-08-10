@@ -1,3 +1,4 @@
+use futures::future::err;
 use gasket::error::AsWorkError;
 use log::{error, warn};
 use pallas::ledger::traverse::MultiEraBlock;
@@ -57,6 +58,7 @@ impl RollbackData {
                 (None, vec![])
             }
             Point::Specific(slot, _) => {
+                error!("slot was {}", slot);
                 last_valid_block = match db.get_lt(slot.to_string().as_bytes()).unwrap() {
                     None => None,
                     Some((_, value)) => Some(value.to_vec())
