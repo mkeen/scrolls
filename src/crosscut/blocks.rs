@@ -47,6 +47,8 @@ impl RollbackData {
     pub fn enqueue_rollback_batch(&mut self, from: &Point) -> bool {
         let blocks = self.get_rollback_range(from);
 
+        warn!("hi!!!!! {}", blocks.len());
+
         match !blocks.is_empty() {
             false => false,
             true => {
