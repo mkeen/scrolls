@@ -54,7 +54,6 @@ impl RollbackData {
                 (None, vec![])
             }
             Point::Specific(slot, _) => {
-                log::warn!("trying to get last valid block");
                 last_valid_block = db.get_lt(slot.clone().to_string().as_bytes()).unwrap().map(|(_, value)| value.to_vec());
 
                 current_block = match db.get(slot.to_string().as_bytes()).unwrap() {
@@ -69,7 +68,6 @@ impl RollbackData {
                 log::warn!("START BLOCKING");
                 while let Some((current_slot, current_block)) = db.get_gt(last_sibling_found.to_string().as_bytes()).unwrap() {
                     last_sibling_found = std::str::from_utf8(&current_slot).unwrap().to_string();
-                    log::warn!("current_block.to_vec(): {}", last_sibling_found);
                     blocks_to_roll_back.push(current_block.to_vec())
                 }
 
@@ -77,7 +75,6 @@ impl RollbackData {
                     None => {log::warn!("END BLOCKING {} {} *{}", blocks_to_roll_back.len(), slot, "!!")}
                     Some(last_valid_block) => {
                         log::warn!("END BLOCKING {} {} *{}", blocks_to_roll_back.len(), last_valid_block.len(), slot);
-
                     }
                 }
 
