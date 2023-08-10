@@ -67,14 +67,12 @@ impl gasket::runtime::Worker for Worker {
 
         match msg.payload {
             model::RawBlockPayload::RollForward(cbor) => {
-                warn!("rollfwd {}", cbor.len());
                 self.output.send(model::EnrichedBlockPayload::roll_forward(
                     cbor,
                     BlockContext::default(),
                 ))?;
             }
             model::RawBlockPayload::RollBack(previous_cbor, revert_cbor_blocks, ) => {
-                error!("i should have known {} {}", previous_cbor.len(), previous_cbor.len());
                 self.output
                     .send(model::EnrichedBlockPayload::roll_back(previous_cbor, revert_cbor_blocks, vec![]))?;
             }
