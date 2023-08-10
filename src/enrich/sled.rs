@@ -141,7 +141,6 @@ fn fetch_referenced_utxo<'a>(
 impl Worker {
     #[inline]
     fn insert_produced_utxos(&self, db: &sled::Db, produced_ring: &sled::Tree, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
-        error!("inserting produced utxos");
         let mut insert_batch = sled::Batch::default();
         let mut rollback_insert_batch = sled::Batch::default();
 
@@ -170,8 +169,6 @@ impl Worker {
     }
 
     fn remove_produced_utxos(&self, db: &sled::Db, produced_ring: &sled::Tree, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
-        error!("rolling back produced utxos");
-
         let mut insert_batch = sled::Batch::default();
         let mut rollback_insert_batch = sled::Batch::default();
 
@@ -196,9 +193,6 @@ impl Worker {
         db: &sled::Db,
         txs: &[MultiEraTx],
     ) -> Result<BlockContext, crate::Error> {
-        error!("fetching referenced utxos");
-
-
         let mut ctx = BlockContext::default();
 
         let required: Vec<_> = txs
@@ -355,14 +349,11 @@ impl gasket::runtime::Worker for Worker {
                 self.blocks_counter.inc(1);
             }
             model::RawBlockPayload::RollBack(last_valid, revert_blocks) => {
-                warn!("rolling back decor {} {}", last_valid.len(), revert_blocks.len());
                 let mut ctx: Vec<BlockContext> = vec![];
 
                 for cbor in revert_blocks.iter().rev() {
-                    warn!("trying to decode {}", cbor.len());
 
                     if cbor.is_empty() {
-                        warn!("skipping empty cbor {}", cbor.len());
                         continue
                     }
 
@@ -371,14 +362,11 @@ impl gasket::runtime::Worker for Worker {
                         .apply_policy(&self.policy)
                         .or_panic()?;
 
-                    warn!("decoded{}", cbor.len());
 
                     let block = match block {
                         Some(x) => x,
                         None => return Ok(gasket::runtime::WorkOutcome::Partial),
                     };
-
-                    warn!("rolling back decor here {} {}", last_valid.len(), revert_blocks.len());
 
                     let txs = block.txs();
 
@@ -394,7 +382,6 @@ impl gasket::runtime::Worker for Worker {
                 }
 
                 if revert_blocks.len() > 0 {
-                    error!("trying to roll back something {} {}", last_valid.len(), revert_blocks.len());
                     self.output.send(model::EnrichedBlockPayload::roll_back(last_valid, revert_blocks, ctx.into_iter().rev().collect()))?;
                 }
             }
