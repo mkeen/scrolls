@@ -2,7 +2,7 @@ use std::time::Duration;
 use futures::future::err;
 
 use gasket::runtime::{spawn_stage, WorkOutcome};
-use log::error;
+use log::{error, warn};
 
 use crate::{
     bootstrap,
@@ -67,6 +67,7 @@ impl gasket::runtime::Worker for Worker {
 
         match msg.payload {
             model::RawBlockPayload::RollForward(cbor) => {
+                warn!("rollfwd {}", cbor.len())
                 self.output.send(model::EnrichedBlockPayload::roll_forward(
                     cbor,
                     BlockContext::default(),
