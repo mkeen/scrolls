@@ -11,7 +11,7 @@ use crate::prelude::*;
 #[derive(Debug, Clone)]
 pub enum RawBlockPayload {
     RollForward(Vec<u8>),
-    RollBack(Vec<u8>, Vec<Vec<u8>>),
+    RollBack(Vec<Vec<u8>>),
 }
 
 impl RawBlockPayload {
@@ -21,9 +21,9 @@ impl RawBlockPayload {
         }
     }
 
-    pub fn roll_back(last_valid: Vec<u8>, revert_blocks: Vec<Vec<u8>>) -> gasket::messaging::Message<Self> {
+    pub fn roll_back(revert_blocks: Vec<Vec<u8>>) -> gasket::messaging::Message<Self> {
         gasket::messaging::Message {
-            payload: Self::RollBack(last_valid, revert_blocks),
+            payload: Self::RollBack(revert_blocks),
         }
     }
 }
@@ -74,7 +74,7 @@ impl BlockContext {
 #[derive(Debug, Clone)]
 pub enum EnrichedBlockPayload {
     RollForward(Vec<u8>, BlockContext),
-    RollBack(Vec<u8>, Vec<Vec<u8>>, Vec<BlockContext>),
+    RollBack(Vec<Vec<u8>>, Vec<BlockContext>),
 }
 
 impl EnrichedBlockPayload {
@@ -84,9 +84,9 @@ impl EnrichedBlockPayload {
         }
     }
 
-    pub fn roll_back(previous_block: Vec<u8>, revert_blocks: Vec<Vec<u8>>, ctx: Vec<BlockContext>) -> gasket::messaging::Message<Self> {
+    pub fn roll_back(revert_blocks: Vec<Vec<u8>>, ctx: Vec<BlockContext>) -> gasket::messaging::Message<Self> {
         gasket::messaging::Message {
-            payload: Self::RollBack(previous_block, revert_blocks, ctx),
+            payload: Self::RollBack(revert_blocks, ctx),
         }
     }
 }

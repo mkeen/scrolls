@@ -363,7 +363,7 @@ impl gasket::runtime::Worker for Worker {
 
                 self.blocks_counter.inc(1);
             }
-            model::RawBlockPayload::RollBack(last_valid, revert_blocks) => {
+            model::RawBlockPayload::RollBack(revert_blocks) => {
                 let mut ctx: Vec<BlockContext> = vec![];
 
                 for cbor in revert_blocks.iter().rev() {
@@ -400,7 +400,7 @@ impl gasket::runtime::Worker for Worker {
                 }
 
                 if revert_blocks.len() > 0 {
-                    self.output.send(model::EnrichedBlockPayload::roll_back(last_valid, revert_blocks, ctx.into_iter().rev().collect()))?;
+                    self.output.send(model::EnrichedBlockPayload::roll_back(revert_blocks, ctx.into_iter().rev().collect()))?;
                 }
             }
         };

@@ -42,38 +42,24 @@ impl RollbackData {
         self.get_db_ref().flush()
     }
 
-    pub fn get_rollback_range(&self, from: Point) -> (Option<Vec<u8>>, Vec<Vec<u8>>) {
+    pub fn get_rollback_range(&self, from: Point) -> Vec<Vec<u8>> {
         let mut last_valid_block: Option<Vec<u8>> = None;
         let mut current_block: Vec<u8> = vec![];
         let mut blocks_to_roll_back: Vec<Vec<u8>> = vec![];
 
         let db = self.get_db_ref();
 
-        match from {
-            Point::Origin => {
-                // Todo map point to well known
-                (None, vec![])
-            }
-            Point::Specific(slot, _) => {
-                last_valid_block = db.get_lt(slot.clone().to_string().as_bytes()).unwrap().map(|(_, value)| value.to_vec());
+        let slot = from.slot_or_default().to_string();
 
-                current_block = match db.get(slot.to_string().as_bytes()).unwrap() {
-                    None => vec![],
-                    Some(value) => value.to_vec()
-                };
+        last_valid_block = db.get_lt(slot.as_bytes()).unwrap().map(|(_, value)| value.to_vec());
 
-                blocks_to_roll_back.push(current_block.to_vec());
+        current_block = match db.get(slot.as_bytes()).unwrap() {
+            None => vec![],
+            Some(value) => value.to_vec()
+        };
 
-                let mut last_sibling_found = slot.clone().to_string();
-
-                while let Some((current_slot, current_block)) = db.get_gt(last_sibling_found.to_string().as_bytes()).unwrap() {
-                    last_sibling_found = std::str::from_utf8(&current_slot).unwrap().to_string();
-                    blocks_to_roll_back.push(current_block.to_vec())
-                }
-
-                (last_valid_block, blocks_to_roll_back)
-            }
-        }
+        blocks_to_roll_back.push(current_block.to_vec());
+        blocks_to_roll_back
     }
 
     pub fn insert_block(&self, point: &Point, block: &Vec<u8>) {

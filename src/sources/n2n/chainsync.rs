@@ -106,12 +106,10 @@ impl Worker {
                 Ok(())
             }
             chainsync::RollbackEffect::OutOfScope => {
-                let (last_valid, blocks) = self.blocks.get_rollback_range(point.clone());
+                let blocks = self.blocks.get_rollback_range(point.clone());
 
-                if let Some(last_valid) = last_valid {
-                    if !blocks.is_empty() {
-                        self.output.send(model::RawBlockPayload::roll_back(last_valid, blocks))?;
-                    }
+                if !blocks.is_empty() {
+                    self.output.send(model::RawBlockPayload::roll_back(blocks))?;
                 } else {
                     log::warn!("skipped rollback, blocks are unknown {:?}", point);
                 }
