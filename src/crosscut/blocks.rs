@@ -75,7 +75,7 @@ impl RollbackData {
 
         // Trim excess blocks
         if current_len > 2000000 {
-            for _ in 0..100 {
+            for _ in 0..1000 {
                 warn!("trimming db {}", current_len);
                 let first = match db.first() {
                     Ok(first) => first,
