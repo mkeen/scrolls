@@ -1,4 +1,4 @@
-use log::{error, info};
+use log::{debug, error, info};
 use pallas::codec::minicbor::bytes::nil;
 use pallas::ledger::traverse::MultiEraBlock;
 
@@ -80,41 +80,45 @@ impl Worker {
             .apply_policy(&self.policy)
             .or_panic().unwrap();
 
-        if let Some(last_valid_block) = last_valid_block {
+        if let Some(last_valid_block) = last_valid_block.clone() {
             self.last_block.set(last_valid_block.number() as i64);
 
             self.output.send(gasket::messaging::Message::from(
                 model::CRDTCommand::block_starting(&last_valid_block),
             ))?;
+        }
 
-            for (k, block) in blocks.iter().enumerate().rev() {
-                let block = MultiEraBlock::decode(block)
-                    .map_err(crate::Error::cbor)
-                    .apply_policy(&self.policy)
-                    .or_panic()?;
+        for (k, block) in blocks.iter().enumerate().rev() {
+            debug!("trying to roll back {}", block.len());
 
-                let block = match block {
-                    Some(x) => x,
-                    None => return Ok(()),
-                };
+            let block = MultiEraBlock::decode(block)
+                .map_err(crate::Error::cbor)
+                .apply_policy(&self.policy)
+                .or_panic()?;
 
-                let default_context = BlockContext::default();
+            let block = match block {
+                Some(x) => x,
+                None => return Ok(()),
+            };
 
-                let mut to_reverse = ctx.clone();
-                to_reverse.reverse();
+            let default_context = BlockContext::default();
 
-                let context = match to_reverse.get(k) {
-                    None => &default_context,
-                    Some(context) => context
-                };
+            let mut to_reverse = ctx.clone();
+            to_reverse.reverse();
 
-                for reducer in self.reducers.iter_mut() {
-                    reducer.reduce_block(&block, context, true, &mut self.output)?;
-                    self.ops_count.inc(1);
-                }
+            let context = match to_reverse.get(k) {
+                None => &default_context,
+                Some(context) => context
+            };
 
+            for reducer in self.reducers.iter_mut() {
+                reducer.reduce_block(&block, context, true, &mut self.output)?;
+                self.ops_count.inc(1);
             }
 
+        }
+
+        if let Some(last_valid_block) = last_valid_block {
             self.output.send(gasket::messaging::Message::from(
                 model::CRDTCommand::block_finished(&last_valid_block),
             ))?;
@@ -143,7 +147,7 @@ impl gasket::runtime::Worker for Worker {
             }
             model::EnrichedBlockPayload::RollBack(last_valid_block, blocks_to_rollback, contexts) => {
                 error!("starting to attempt a rollback {} {} {}", last_valid_block.len(), blocks_to_rollback.len(), contexts.len());
-                if !last_valid_block.is_empty() && !blocks_to_rollback.is_empty() {
+                if !blocks_to_rollback.is_empty() {
                     self.reduce_rollback_blocks(&last_valid_block, &blocks_to_rollback, &contexts)?;
                 }
             }
