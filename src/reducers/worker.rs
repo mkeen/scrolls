@@ -40,7 +40,9 @@ impl Worker {
     fn reduce_block<'b>(
         &mut self,
         block: &'b Vec<u8>,
+        rollback: bool,
         ctx: &model::BlockContext,
+
     ) -> Result<(), gasket::error::Error> {
         let block = MultiEraBlock::decode(block)
             .map_err(crate::Error::cbor)
@@ -59,7 +61,7 @@ impl Worker {
         ))?;
 
         for reducer in self.reducers.iter_mut() {
-            reducer.reduce_block(&block, ctx, false, &mut self.output)?;
+            reducer.reduce_block(&block, ctx, rollback, &mut self.output)?;
             self.ops_count.inc(1);
         }
 
@@ -70,40 +72,6 @@ impl Worker {
         Ok(())
     }
 
-    fn reduce_rollback_blocks<'b>(
-        &mut self,
-        blocks: &'b Vec<Vec<u8>>,
-        ctx: &'b Vec<model::BlockContext>,
-    ) -> Result<(), gasket::error::Error> {
-        let reversed_blocks = blocks.iter().rev();
-
-        let mut reversed_contexts = ctx.clone();
-        reversed_contexts.reverse();
-
-        for (k, block) in reversed_blocks.enumerate() {
-            let block = MultiEraBlock::decode(block)
-                .map_err(crate::Error::cbor)
-                .apply_policy(&self.policy);
-
-            if let Ok(block) = block {
-                if let Some(block) = block.as_ref() {
-                    let default_context = BlockContext::default();
-
-                    let context = match reversed_contexts.get(k) {
-                        None => &default_context,
-                        Some(context) => context
-                    };
-
-                    for reducer in self.reducers.iter_mut() {
-                        reducer.reduce_block(block, context, true, &mut self.output)?;
-                        self.ops_count.inc(1);
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
 }
 
 
@@ -120,11 +88,11 @@ impl gasket::runtime::Worker for Worker {
 
         match msg.payload {
             model::EnrichedBlockPayload::RollForward(block, ctx) => {
-                self.reduce_block(&block, &ctx)?
+                self.reduce_block(&block, false, &ctx)?
             }
-            model::EnrichedBlockPayload::RollBack(blocks_to_rollback, contexts) => {
-                error!("running rollback reducers {} {}", blocks_to_rollback.len(), contexts.len());
-                self.reduce_rollback_blocks(&blocks_to_rollback, &contexts)?;
+            model::EnrichedBlockPayload::RollBack(block, ctx) => {
+                error!("running rollback reducers {}", block.len());
+                self.reduce_block(&block, true, &ctx)?
             }
         }
 
