@@ -1,4 +1,5 @@
 use gasket::error::AsWorkError;
+use log::warn;
 use pallas::ledger::traverse::MultiEraBlock;
 use pallas::network::miniprotocols::Point;
 use sled::{Batch, Db, IVec, Tree};
@@ -88,6 +89,7 @@ impl RollbackData {
         if current_len > 10000000 {
             let mut db_iter =  db.iter();
             for _ in [0..100] {
+                warn!("trimming db {}", current_len);
                 match db_iter.next() {
                     None => break,
                     Some(iter_res) => match iter_res {
