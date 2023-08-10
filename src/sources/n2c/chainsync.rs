@@ -94,9 +94,6 @@ impl Worker {
             }
             chainsync::RollbackEffect::OutOfScope => {
                 log::debug!("rollback out of buffer scope, sending event down the pipeline");
-                let blocks_to_roll = self.blocks.get_rollback_range(point.clone());
-
-                self.output.send(model::RawBlockPayload::roll_back(blocks_to_roll))?;
             }
         }
 
