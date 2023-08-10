@@ -86,15 +86,11 @@ impl Worker {
         let mut reversed_contexts = ctx.clone();
         reversed_contexts.reverse();
 
-        if let Ok(Some(last_valid_block)) = last_valid_block.as_ref() {
-            self.last_block.set(last_valid_block.number() as i64);
-
-            self.output.send(gasket::messaging::Message::from(
-                model::CRDTCommand::block_starting(last_valid_block),
-            ))?;
-        }
-
         for (k, block) in reversed_blocks.enumerate() {
+            if k == 0 && last_valid_block.is_ok() {
+
+            }
+
             debug!("trying to roll back {}", block.len());
             let cbor_block = block.clone();
 
@@ -120,12 +116,6 @@ impl Worker {
                     self.ops_count.inc(1);
                 }
             }
-        }
-
-        if let Ok(Some(last_valid_block)) = last_valid_block.as_ref() {
-            self.output.send(gasket::messaging::Message::from(
-                model::CRDTCommand::block_finished(last_valid_block),
-            ))?;
         }
 
         Ok(())
