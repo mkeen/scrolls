@@ -1,4 +1,4 @@
-use log::error;
+use log::{error, info};
 use pallas::codec::minicbor::bytes::nil;
 use pallas::ledger::traverse::MultiEraBlock;
 
@@ -38,7 +38,7 @@ impl Worker {
 
     fn reduce_block<'b>(
         &mut self,
-        block: &'b [u8],
+        block: &'b Vec<u8>,
         ctx: &model::BlockContext,
     ) -> Result<(), gasket::error::Error> {
         let block = MultiEraBlock::decode(block)
@@ -136,6 +136,7 @@ impl gasket::runtime::Worker for Worker {
 
         match msg.payload {
             model::EnrichedBlockPayload::RollForward(block, ctx) => {
+                info!("Rolling forward");
                 self.reduce_block(&block, &ctx)?
             }
             model::EnrichedBlockPayload::RollBack(last_valid_block, blocks_to_rollback, contexts) => {

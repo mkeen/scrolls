@@ -1,7 +1,7 @@
-use std::time::Duration;
 use clap;
 use scrolls::{bootstrap, crosscut, enrich, reducers, sources, storage};
 use serde::Deserialize;
+use std::time::Duration;
 
 use crate::console;
 
@@ -105,9 +105,8 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
         .map_err(|err| scrolls::Error::ConfigError(format!("{:?}", err)))?;
 
     let chain = config.chain.unwrap_or_default().into();
-    let policy = config.policy.unwrap_or_default().into();
-
     let blocks = crosscut::blocks::RollbackData::open_db(config.blocks.unwrap_or_default());
+    let policy = config.policy.unwrap_or_default().into();
 
     let source = config
         .source

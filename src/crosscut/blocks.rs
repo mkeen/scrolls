@@ -1,4 +1,5 @@
 use gasket::error::AsWorkError;
+use log::warn;
 use pallas::ledger::traverse::MultiEraBlock;
 use pallas::network::miniprotocols::Point;
 use sled::{Db, IVec, Tree};
@@ -6,8 +7,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 pub struct RollbackData {
-    db: Db,
-    block_tree: Tree,
+    db: Option<Db>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -27,18 +27,19 @@ impl Default for Config {
 impl RollbackData {
     pub fn open_db(config: Config) -> Self {
         let db = sled::open(config.db_path).or_retry().unwrap();
-        let block_tree = db.open_tree("blocks").unwrap();
 
         RollbackData {
-            db,
-            block_tree,
+            db: Some(db),
         }
 
     }
 
-    pub fn close(&self) {
-        self.block_tree.flush();
-        self.db.flush();
+    fn get_db_ref(&self) -> &Db {
+        self.db.as_ref().unwrap()
+    }
+
+    pub fn close(&self) -> sled::Result<usize> {
+        self.get_db_ref().flush()
     }
 
     pub fn get_rollback_range(&self, from: Point) -> (Option<Vec<u8>>, Vec<Vec<u8>>) {
@@ -46,18 +47,20 @@ impl RollbackData {
         let mut current_block: Vec<u8> = vec![];
         let mut blocks_to_roll_back: Vec<Vec<u8>> = vec![];
 
+        let db = self.get_db_ref();
+
         match from {
             Point::Origin => {
                 // Todo map point to well known
                 (None, vec![])
             }
             Point::Specific(slot, _) => {
-                last_valid_block = match self.block_tree.get_lt(slot.to_string().as_bytes()).unwrap() {
+                last_valid_block = match db.get_lt(slot.to_string().as_bytes()).unwrap() {
                     None => None,
                     Some((_, value)) => Some(value.to_vec())
                 };
 
-                current_block = match self.block_tree.get(slot.to_string().as_bytes()).unwrap() {
+                current_block = match db.get(slot.to_string().as_bytes()).unwrap() {
                     None => vec![],
                     Some(value) => value.to_vec()
                 };
@@ -66,7 +69,7 @@ impl RollbackData {
 
                 let mut last_sibling_found = slot.clone().to_string();
 
-                while let Some((current_slot, current_block)) = self.block_tree.get_gt(last_sibling_found.to_string().as_bytes()).unwrap() {
+                while let Some((current_slot, current_block)) = db.get_gt(last_sibling_found.to_string().as_bytes()).unwrap() {
                     last_sibling_found = std::str::from_utf8(&current_slot.to_vec()).unwrap().to_string();
                     blocks_to_roll_back.push(current_block.to_vec())
                 }
@@ -77,16 +80,18 @@ impl RollbackData {
     }
 
     pub fn insert_block(&self, block: Vec<u8>, block_readable: MultiEraBlock) {
+        warn!("inseting block {}", block.len());
         let key = block_readable.slot().to_string();
-        self.block_tree.insert(key.as_bytes(), IVec::from(block)).unwrap();
+        let db = self.get_db_ref();
+        db.insert(key.as_bytes(), IVec::from(block)).unwrap();
 
-        let current_len = self.block_tree.len();
+        let current_len = db.len();
 
         // Trim excess blocks
         if current_len > 1000 {
             for _ in [0..(current_len - 1000)] {
-                let (trim_key, _) = self.block_tree.iter().next().unwrap().unwrap();
-                self.block_tree.remove(trim_key).unwrap();
+                let (trim_key, _) = db.iter().next().unwrap().unwrap();
+                db.remove(trim_key).unwrap();
             }
         }
     }
@@ -97,7 +102,7 @@ impl RollbackData {
                 None
             }
             Point::Specific(slot, _) => {
-                Some(self.block_tree.get(slot.to_string().as_bytes()).unwrap().unwrap().to_vec())
+                Some(self.get_db_ref().get(slot.to_string().as_bytes()).unwrap().unwrap().to_vec())
             }
         }
     }
