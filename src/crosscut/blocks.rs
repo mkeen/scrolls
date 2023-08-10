@@ -94,7 +94,7 @@ impl RollbackData {
         }
     }
 
-    pub fn get_block_at_pogint(&self, point: &Point) -> Option<Vec<u8>> {
+    pub fn get_block_at_point(&self, point: &Point) -> Option<Vec<u8>> {
         match self.get_db_ref().get(point.slot_or_default().to_string().as_bytes()) {
             Ok(block) => match block {
                 None => None,

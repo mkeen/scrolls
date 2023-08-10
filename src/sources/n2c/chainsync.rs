@@ -184,7 +184,6 @@ impl gasket::runtime::Worker for Worker {
         log::info!("chain-sync intersection is {:?}", start);
 
         self.chainsync = Some(chainsync);
-
         Ok(())
     }
 
@@ -200,12 +199,10 @@ impl gasket::runtime::Worker for Worker {
 
         // find confirmed block in memory and send down the pipeline
         for point in ready {
-            let block = self
-                .blocks.get_block_at_point(&point);
+            let block = self.blocks.get_block_at_point(&point);
 
             if let Some(block) = block {
-                self.output
-                    .send(model::RawBlockPayload::roll_forward(block))?;
+                self.output.send(model::RawBlockPayload::roll_forward(block))?;
                 self.block_count.inc(1);
             } else {
                 log::warn!("couldn't find block in buffer: {}", &point.slot_or_default())
