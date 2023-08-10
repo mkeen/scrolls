@@ -43,6 +43,7 @@ struct ConfigRoot {
     finalize: Option<crosscut::FinalizeConfig>,
     chain: Option<ChainConfig>,
     policy: Option<crosscut::policies::RuntimePolicy>,
+    blocks: Option<crosscut::blocks::Config>,
 }
 
 impl ConfigRoot {
@@ -104,11 +105,12 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
         .map_err(|err| scrolls::Error::ConfigError(format!("{:?}", err)))?;
 
     let chain = config.chain.unwrap_or_default().into();
+    let blocks = crosscut::blocks::RollbackData::open_db(config.blocks.unwrap_or_default());
     let policy = config.policy.unwrap_or_default().into();
 
     let source = config
         .source
-        .bootstrapper(&chain, &config.intersect, &config.finalize, &policy);
+        .bootstrapper(&chain, &blocks, &config.intersect, &config.finalize, &policy);
 
     let enrich = config.enrich.unwrap_or_default().bootstrapper(&policy);
 
@@ -124,6 +126,8 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
         console::refresh(&args.console, &pipeline);
         std::thread::sleep(Duration::from_millis(1500));
     }
+
+    blocks.close();
 
     log::info!("Scrolls is stopping...");
 

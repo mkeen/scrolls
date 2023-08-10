@@ -4,6 +4,7 @@ use pallas::network::miniprotocols::chainsync::BlockContent;
 use pallas::network::miniprotocols::{chainsync, Point};
 use pallas::network::multiplexer::StdChannel;
 use std::collections::HashMap;
+use log::error;
 
 use crate::prelude::*;
 use crate::{crosscut, model, sources::utils, storage, Error};
@@ -21,13 +22,12 @@ pub struct Worker {
     min_depth: usize,
     policy: crosscut::policies::RuntimePolicy,
     chain_buffer: chainsync::RollbackBuffer,
-    blocks: HashMap<Point, chainsync::BlockContent>,
     chain: crosscut::ChainWellKnownInfo,
+    blocks: crosscut::blocks::RollbackData,
     intersect: crosscut::IntersectConfig,
     cursor: storage::Cursor,
     finalize: Option<crosscut::FinalizeConfig>,
     chainsync: Option<chainsync::N2CClient<StdChannel>>,
-
     output: OutputPort,
     block_count: gasket::metrics::Counter,
     chain_tip: gasket::metrics::Gauge,
@@ -39,6 +39,7 @@ impl Worker {
         min_depth: usize,
         policy: crosscut::policies::RuntimePolicy,
         chain: crosscut::ChainWellKnownInfo,
+        blocks: crosscut::blocks::RollbackData,
         intersect: crosscut::IntersectConfig,
         finalize: Option<crosscut::FinalizeConfig>,
         cursor: storage::Cursor,
@@ -49,6 +50,7 @@ impl Worker {
             min_depth,
             policy,
             chain,
+            blocks,
             intersect,
             finalize,
             cursor,
@@ -57,7 +59,6 @@ impl Worker {
             block_count: Default::default(),
             chain_tip: Default::default(),
             chain_buffer: chainsync::RollbackBuffer::new(),
-            blocks: HashMap::new(),
         }
     }
 
@@ -77,9 +78,7 @@ impl Worker {
 
         let point = Point::Specific(block.slot(), block.hash().to_vec());
 
-        // store the block for later retrieval
-        // TODO: MEMORY LEAK POTENTIAL
-        self.blocks.insert(point.clone(), content);
+        self.blocks.insert_block(&point, &content.0);
 
         // track the new point in our memory buffer
         log::debug!("rolling forward to point {:?}", point);
@@ -97,8 +96,12 @@ impl Worker {
             }
             chainsync::RollbackEffect::OutOfScope => {
                 log::debug!("rollback out of buffer scope, sending event down the pipeline");
-                self.output
-                    .send(model::RawBlockPayload::roll_back(point.clone()))?;
+                let (last_valid, blocks_to_roll) = self.blocks.get_rollback_range(point.clone());
+
+                self.output.send(model::RawBlockPayload::roll_back(match last_valid {
+                    None => vec![],
+                    Some(valid) => valid
+                }, blocks_to_roll))?;
             }
         }
 
@@ -198,9 +201,7 @@ impl gasket::runtime::Worker for Worker {
         // find confirmed block in memory and send down the pipeline
         for point in ready {
             let block = self
-                .blocks
-                .remove(&point)
-                .expect("required block not found in memory");
+                .blocks.get_block_at_point(point.clone()).unwrap();
 
             self.output
                 .send(model::RawBlockPayload::roll_forward(block.into()))?;
