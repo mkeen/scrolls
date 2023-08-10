@@ -69,7 +69,7 @@ impl RollbackData {
                 log::warn!("START BLOCKING");
                 while let Some((current_slot, current_block)) = db.get_gt(last_sibling_found.to_string().as_bytes()).unwrap() {
                     last_sibling_found = std::str::from_utf8(&current_slot).unwrap().to_string();
-                    log::warn!("current_block.to_vec(): {}", current_block.to_vec());
+                    log::warn!("current_block.to_vec(): {}", current_block.to_vec().len());
                     blocks_to_roll_back.push(current_block.to_vec())
                 }
 
