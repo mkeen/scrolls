@@ -106,7 +106,6 @@ impl Worker {
                 Ok(())
             }
             chainsync::RollbackEffect::OutOfScope => {
-                self.output.send(model::RawBlockPayload::roll_back(point))?;
                 Ok(())
             }
         }
