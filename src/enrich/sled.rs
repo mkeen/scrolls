@@ -5,6 +5,7 @@ use gasket::{
     runtime::{spawn_stage, WorkOutcome},
 };
 use gasket::error::Error;
+use log::error;
 
 use pallas::{
     codec::minicbor,
@@ -346,6 +347,7 @@ impl gasket::runtime::Worker for Worker {
                 self.blocks_counter.inc(1);
             }
             model::RawBlockPayload::RollBack(last_valid, revert_blocks) => {
+                error!("trying to roll back something {} {}", last_valid.len(), revert_blocks.len());
                 let mut ctx: Vec<BlockContext> = vec![];
 
                 for cbor in revert_blocks.iter().rev() {
