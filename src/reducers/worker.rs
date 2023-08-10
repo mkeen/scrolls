@@ -1,3 +1,4 @@
+use log::error;
 use pallas::codec::minicbor::bytes::nil;
 use pallas::ledger::traverse::MultiEraBlock;
 
@@ -139,6 +140,7 @@ impl gasket::runtime::Worker for Worker {
                 self.reduce_block(&block, &ctx)?
             }
             model::EnrichedBlockPayload::RollBack(last_valid_block, blocks_to_rollback, contexts) => {
+                error!("starting to attempt a rollback {} {} {}", last_valid_block.len(), blocks_to_rollback.len(), contexts.len());
                 self.reduce_rollback_blocks(&last_valid_block, &blocks_to_rollback, &contexts)?;
             }
         }
