@@ -78,14 +78,16 @@ impl Worker {
         let last_valid_block = MultiEraBlock::decode(last_valid_block)
             .map_err(crate::Error::cbor)
             .apply_policy(&self.policy)
-            .or_panic().unwrap();
+            .or_panic();
 
-        if let Some(last_valid_block) = last_valid_block.clone() {
-            self.last_block.set(last_valid_block.number() as i64);
+        if let Ok(last_valid_block) = last_valid_block.as_ref() {
+            if let Some(last_valid_block) = last_valid_block {
+                self.last_block.set(last_valid_block.number() as i64);
 
-            self.output.send(gasket::messaging::Message::from(
-                model::CRDTCommand::block_starting(&last_valid_block),
-            ))?;
+                self.output.send(gasket::messaging::Message::from(
+                    model::CRDTCommand::block_starting(last_valid_block),
+                ))?;
+            }
         }
 
         for (k, block) in blocks.iter().enumerate().rev() {
@@ -118,11 +120,12 @@ impl Worker {
 
         }
 
-        if let Some(last_valid_block) = last_valid_block {
-            self.output.send(gasket::messaging::Message::from(
-                model::CRDTCommand::block_finished(&last_valid_block),
-            ))?;
-
+        if let Ok(last_valid_block) = last_valid_block.as_ref() {
+            if let Some(last_valid_block) = last_valid_block {
+                self.output.send(gasket::messaging::Message::from(
+                    model::CRDTCommand::block_finished(last_valid_block),
+                ))?;
+            }
         }
 
         Ok(())
