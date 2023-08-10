@@ -141,7 +141,9 @@ impl gasket::runtime::Worker for Worker {
             }
             model::EnrichedBlockPayload::RollBack(last_valid_block, blocks_to_rollback, contexts) => {
                 error!("starting to attempt a rollback {} {} {}", last_valid_block.len(), blocks_to_rollback.len(), contexts.len());
-                self.reduce_rollback_blocks(&last_valid_block, &blocks_to_rollback, &contexts)?;
+                if !last_valid_block.is_empty() && !blocks_to_rollback.is_empty() {
+                    self.reduce_rollback_blocks(&last_valid_block, &blocks_to_rollback, &contexts)?;
+                }
             }
         }
 
