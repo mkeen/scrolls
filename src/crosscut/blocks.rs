@@ -1,11 +1,7 @@
-use chrono::Duration;
-use futures::StreamExt;
 use gasket::error::AsWorkError;
 use pallas::ledger::traverse::MultiEraBlock;
 use pallas::network::miniprotocols::Point;
-use redis::Commands;
-use sled::{Db, Config, IVec, Tree};
-use crate::Error;
+use sled::{Db, IVec, Tree};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
@@ -16,20 +12,20 @@ pub struct RollbackData {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub struct RollbackDataConfig {
+pub struct Config {
     pub db_path: String,
 }
 
-impl Default for RollbackDataConfig {
+impl Default for Config {
     fn default() -> Self {
-        RollbackDataConfig {
+        Config {
             db_path: "/data/sled_default1".to_string()
         }
     }
 }
 
 impl RollbackData {
-    pub fn open_db(config: RollbackDataConfig) -> Self {
+    pub fn open_db(config: Config) -> Self {
         let db = sled::open(config.db_path).or_retry().unwrap();
         let block_tree = db.open_tree("blocks").unwrap();
 

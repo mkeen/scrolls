@@ -4,7 +4,6 @@ use pallas::network::miniprotocols::{blockfetch, chainsync, Point};
 
 use gasket::error::AsWorkError;
 use pallas::network::multiplexer::StdChannel;
-use sled_extensions::Db;
 
 use crate::sources::n2n::transport::Transport;
 use crate::{crosscut, model, sources::utils, storage, Error};

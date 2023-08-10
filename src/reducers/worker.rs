@@ -105,7 +105,6 @@ impl Worker {
                     Some(context) => context
                 };
 
-
                 for reducer in self.reducers.iter_mut() {
                     reducer.reduce_block(&block, context, true, &mut self.output)?;
                     self.ops_count.inc(1);
