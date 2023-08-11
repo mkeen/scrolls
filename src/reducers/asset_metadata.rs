@@ -286,10 +286,11 @@ impl Reducer {
 
                     if let Ok(asset_name_str) = String::from_utf8(asset_name.to_vec()) {
                         if !policy_id_str.is_empty() {
-                            assets_minted_map.insert(format!("{}{}", policy_id_str, asset_name_str), true);
-
                             for supported_metadata_cip in vec![CIP25_META_NFT, CIP27_META_ROYALTIES] {
                                 if let Some(policy_map) = metadata.find(MetadatumLabel::from(supported_metadata_cip)) {
+                                    // Mark this as seen so we ignore in CIP-54 check
+                                    assets_minted_map.insert(format!("{}{}", policy_id_str, asset_name_str), true);
+
                                     // Todo.. extract asset metadata here and pass into extract
                                     self.extract_and_aggregate_cip_metadata(
                                         output,
@@ -308,7 +309,7 @@ impl Reducer {
             }
         }
 
-        // Search for CIP-54 matched tags
+        // Search for CIP-54 matched tags / then we will make sure we didn't handle this one for minted
         for (_, tx_output) in tx.produces() {
             for output_asset in tx_output.non_ada_assets() {
                 let policy_id = output_asset.policy_hex();
