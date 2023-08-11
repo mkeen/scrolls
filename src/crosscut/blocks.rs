@@ -74,6 +74,10 @@ impl RollbackData {
         self.queue.pop()
     }
 
+    pub fn len(&mut self) -> usize {
+        self.queue.len()
+    }
+
     fn get_rollback_range(&self, from: &Point) -> Vec<Vec<u8>> {
         let mut last_valid_block: Option<Vec<u8>> = None;
         let mut current_block: Vec<u8> = vec![];
@@ -100,9 +104,6 @@ impl RollbackData {
         db.insert(key.to_string().as_bytes(), IVec::from(block.clone()));
 
         let current_len = db.size_on_disk().unwrap();
-        let mut trim_batch = Batch::default();
-
-        log::warn!("writing block to slot buffer {}", current_len);
 
         // Trim excess blocks
         if current_len > 2000000 {
@@ -112,7 +113,6 @@ impl RollbackData {
             };
 
             if let Some((first, _)) = first {
-                log::warn!("removing block from slot buffer {}", current_len);
                 db.remove(first).expect("todo: panic message");
             }
         }

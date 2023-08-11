@@ -230,7 +230,6 @@ impl Worker {
 
         for m in matches? {
             if let Some((key, era, cbor)) = m {
-                warn!("about do be cool");
                 ctx.import_ref_output(&key, era, cbor);
                 self.matches_counter.inc(1);
             } else {
@@ -372,8 +371,8 @@ impl gasket::runtime::Worker for Worker {
 
                 let ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
 
-                warn!("rolling back here {}", cbor.len());
-                self.output.send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
+                self.output
+                    .send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
             }
         };
 

@@ -199,9 +199,15 @@ impl gasket::runtime::Worker for Worker {
 
         // See if we need to roll back
         if let Some(block) = self.blocks.rollback_pop() {
-            log::warn!("rollback magig happening here {}", block.len());
+            let starting_len = self.blocks.len();
             self.output
                 .send(model::RawBlockPayload::roll_back(block))?;
+
+            // evaluate if we should finalize the thread according to config
+            if crosscut::should_finalize(&self.finalize, self.chain_tip) {
+                return Ok(gasket::runtime::WorkOutcome::Done);
+            }
+
         } else {
             // see if we have points that already reached certain depth
             let ready = self.chain_buffer.pop_with_depth(self.min_depth);

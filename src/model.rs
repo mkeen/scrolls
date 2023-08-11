@@ -39,6 +39,8 @@ impl BlockContext {
     }
 
     pub fn find_utxo(&self, key: &OutputRef) -> Result<MultiEraOutput, Error> {
+        log::warn!("about to be acutally cool {}", key.to_string());
+
         let (era, cbor) = self
             .utxos
             .get(&key.to_string())
