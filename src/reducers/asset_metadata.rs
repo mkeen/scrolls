@@ -200,49 +200,49 @@ impl Reducer {
                         if should_store_royalty_metadata && cip == CIP27_META_ROYALTIES {
                             if !rollback {
                                 output.send(CRDTCommand::LastWriteWins(
-                                    format!("{}.{}", prefix, policy_id_str.clone()),
+                                    format!("{}.r.{}", prefix, policy_id_str.clone()),
                                     meta_payload.clone().into(),
                                     timestamp,
                                 ).into());
                             } else {
                                 output.send(CRDTCommand::SortedSetRemove(
-                                    format!("{}.{}", prefix, policy_id_str.clone()),
+                                    format!("{}.r.{}", prefix, policy_id_str.clone()),
                                     meta_payload.clone().into(),
                                     Delta::from(timestamp as i64),
                                 ).into());
                             }
-                        }
+                        } else {
+                            if should_keep_historical_metadata {
+                                if !rollback {
+                                    output.send(CRDTCommand::LastWriteWins(
+                                        format!("{}.{}", prefix, fingerprint_str.clone()),
+                                        meta_payload.clone().into(),
+                                        timestamp,
+                                    ).into());
+                                } else {
+                                    output.send(CRDTCommand::SortedSetRemove(
+                                        format!("{}.{}", prefix, fingerprint_str.clone()),
+                                        meta_payload.clone().into(),
+                                        timestamp as i64,
+                                    ).into());
+                                }
 
-                        if should_keep_historical_metadata {
-                            if !rollback {
-                                output.send(CRDTCommand::LastWriteWins(
+                            } else {
+                                // Can't roll this back with the way it currently works
+                                output.send(CRDTCommand::AnyWriteWins(
                                     format!("{}.{}", prefix, fingerprint_str.clone()),
-                                    meta_payload.clone().into(),
+                                    model::Value::String(meta_payload.clone()),
+                                ).into());
+
+                            };
+
+                            if should_keep_asset_index {
+                                output.send(CRDTCommand::LastWriteWins(
+                                    format!("{}.{}", prefix, policy_id_str),
+                                    fingerprint_str.clone().into(),
                                     timestamp,
                                 ).into());
-                            } else {
-                                output.send(CRDTCommand::SortedSetRemove(
-                                    format!("{}.{}", prefix, fingerprint_str.clone()),
-                                    meta_payload.clone().into(),
-                                    timestamp as i64,
-                                ).into());
                             }
-
-                        } else {
-                            // Can't roll this back with the way it currently works
-                            output.send(CRDTCommand::AnyWriteWins(
-                                format!("{}.{}", prefix, fingerprint_str.clone()),
-                                model::Value::String(meta_payload.clone()),
-                            ).into());
-
-                        };
-
-                        if should_keep_asset_index {
-                            output.send(CRDTCommand::LastWriteWins(
-                                format!("{}.{}", prefix, policy_id_str),
-                                fingerprint_str.clone().into(),
-                                timestamp,
-                            ).into());
                         }
                     }
                 }
