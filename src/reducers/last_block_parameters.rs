@@ -16,115 +16,12 @@ pub struct Reducer {
 }
 
 impl Reducer {
-
-    pub fn current_epoch(
-        &mut self,
-        block: &MultiEraBlock,
-        key: &str,
-        output: &mut super::OutputPort,
-    ) -> Result<(), gasket::error::Error> {
-        let epoch_no = block_epoch(&self.chain, block);
-
-        let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "epoch_no"), Value::BigInt(epoch_no as i128));
-
-        output.send(gasket::messaging::Message::from(crdt))?;
-
-        Result::Ok(())
-    }
-
-    pub fn current_height(
-        &mut self,
-        block: &MultiEraBlock,
-        key: &str,
-        output: &mut super::OutputPort,
-    ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "height"), Value::BigInt(block.number() as i128));
-
-        output.send(gasket::messaging::Message::from(crdt))?;
-
-        Result::Ok(())
-    }
-
-    pub fn current_slot(
-        &mut self,
-        block: &MultiEraBlock,
-        key: &str,
-        output: &mut super::OutputPort,
-    ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "slot_no"), Value::BigInt(block.slot() as i128));
-
-        output.send(gasket::messaging::Message::from(crdt))?;
-
-        Result::Ok(())
-    }
-
-    pub fn current_block_hash(
-        &mut self,
-        block: &MultiEraBlock,
-        key: &str,
-        output: &mut super::OutputPort,
-    ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "block_hash"), Value::String(block.hash().to_string()));
-
-        output.send(gasket::messaging::Message::from(crdt))?;
-
-        Result::Ok(())
-    }
-
-    pub fn current_block_era(
-        &mut self,
-        block: &MultiEraBlock,
-        key: &str,
-        output: &mut super::OutputPort,
-    ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "block_era"), Value::String(block.era().to_string()));
-
-        output.send(gasket::messaging::Message::from(crdt))?;
-
-        Result::Ok(())
-    }
-
-    pub fn current_block_last_tx_hash(
-        &mut self,
-        block: &MultiEraBlock,
-        key: &str,
-        output: &mut super::OutputPort,
-    ) -> Result<(), gasket::error::Error> {
-        if !block.is_empty() {
-            let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "first_transaction_hash"), Value::String(block.txs().first().unwrap().hash().to_string()));
-
-            output.send(gasket::messaging::Message::from(crdt))?;
-
-            let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "last_transaction_hash"), Value::String(block.txs().last().unwrap().hash().to_string()));
-
-            output.send(gasket::messaging::Message::from(crdt))?;
-        }
-
-        Result::Ok(())
-    }
-
-    pub fn current_block_last_tx_count(
-        &mut self,
-        block: &MultiEraBlock,
-        key: &str,
-        output: &mut super::OutputPort,
-    ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "transactions_count"), Value::BigInt(block.tx_count() as i128));
-
-        output.send(gasket::messaging::Message::from(crdt))?;
-
-        Result::Ok(())
-    }
-
     pub fn reduce_block<'b>(
         &mut self,
         block: &'b MultiEraBlock<'b>,
         rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        if rollback {
-            return Ok(());
-        }
 
         let def_key_prefix = "last_block";
 
@@ -133,22 +30,40 @@ impl Reducer {
             None => format!("{}", def_key_prefix.to_string()),
         };
 
-        self.current_epoch(block, &key, output)?;
-        self.current_height(block, &key, output)?;
-        self.current_slot(block, &key, output)?;
-        self.current_block_hash(block, &key, output)?;
-        self.current_block_era(block, &key, output)?;
-        self.current_block_last_tx_hash(block, &key, output)?;
-        self.current_block_last_tx_count(block, &key, output)?;
+        let mut member_keys = vec!["epoch_no".into(), "height".into(), "slot_no".into(), "block_hash".into(), "block_era".into(), "transactions_count".into()];
+        let mut member_values = vec![
+            Value::BigInt(block_epoch(&self.chain, block).into()),
+            Value::BigInt(block.number().into()),
+            Value::BigInt(block.slot().into()),
+            block.hash().to_string().into(),
+            block.era().to_string().into(),
+            Value::String(block.tx_count().to_string().into()), // using a string here to move fast.. some other shits up with bigint for this .into()
+        ];
 
-        Ok(())
+        if let Some(first_tx_hash) = block.txs().first() {
+            member_keys.push("first_transaction_hash".into());
+            member_values.push(first_tx_hash.hash().to_string().into())
+        }
+
+        if let Some(last_tx_hash) = block.txs().last() {
+            member_keys.push("last_transaction_hash".into());
+            member_values.push(last_tx_hash.hash().to_string().into())
+        }
+
+        let crdt = model::CRDTCommand::HashSetMulti(
+            key,
+            member_keys,
+            member_values,
+        );
+
+        output.send(gasket::messaging::Message::from(crdt))
     }
 }
 
 impl Config {
     pub fn plugin(self,
-         chain: &crosscut::ChainWellKnownInfo
-         ) -> super::Reducer {
+                  chain: &crosscut::ChainWellKnownInfo
+    ) -> super::Reducer {
         let reducer = Reducer {
             config: self,
             chain: chain.clone(),

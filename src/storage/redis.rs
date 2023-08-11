@@ -251,6 +251,20 @@ impl gasket::runtime::Worker for Worker {
                     .hset(key, member, value)
                     .or_restart()?;
             }
+            model::CRDTCommand::HashSetMulti(key, members, values) => {
+                log::debug!("setting hash multi on key {} for {} members", key, members.len());
+
+                let mut tuples: Vec<(Member, Value)> = vec![];
+                for (index, member) in members.iter().enumerate() {
+                    tuples.push((member.to_owned(), values[index].clone()));
+                }
+
+                self.connection
+                    .as_mut()
+                    .unwrap()
+                    .hset_multiple(key, &tuples)
+                    .or_restart()?;
+            }
             model::CRDTCommand::HashCounter(key, member, delta) => {
                 log::debug!("increasing hash key {} member {} by {}", key, member, delta);
 

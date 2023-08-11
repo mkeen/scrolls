@@ -1,6 +1,13 @@
-use pallas::ledger::traverse::MultiEraOutput;
+use std::collections::HashMap;
+use std::hash::Hash;
+use pallas::ledger::addresses::{Address, StakeAddress};
+use pallas::ledger::traverse::{Asset, MultiEraOutput};
 use pallas::ledger::traverse::{MultiEraBlock, MultiEraTx, OutputRef};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use bech32::{ToBase32, Variant};
+use blake2::digest::{Update, VariableOutput};
+use blake2::Blake2bVar;
 
 use crate::{crosscut, model, prelude::*};
 
@@ -8,6 +15,7 @@ use crate::{crosscut, model, prelude::*};
 pub struct Config {
     pub key_prefix: Option<String>,
     pub filter: Option<Vec<String>>,
+    pub coin_key_prefix: Option<String>,
 }
 
 pub struct Reducer {
@@ -15,12 +23,142 @@ pub struct Reducer {
     policy: crosscut::policies::RuntimePolicy,
 }
 
+// hash and index are stored in the key
+#[derive(Deserialize, Serialize)]
+pub struct DropKingMultiAssetUTXO {
+    policy_id: String,
+    name: String,
+    quantity: u64,
+    tx_address: String,
+    fingerprint: String,
+}
+
+fn asset_fingerprint(
+    data_list: [&str; 2],
+) -> Result<String, bech32::Error> {
+    let combined_parts = data_list.join("");
+    let raw = hex::decode(combined_parts).unwrap();
+    let mut hasher = Blake2bVar::new(20).unwrap();
+    hasher.update(&raw);
+    let mut buf = [0u8; 20];
+    hasher.finalize_variable(&mut buf).unwrap();
+    let base32_combined = buf.to_base32();
+    bech32::encode("asset", base32_combined, Variant::Bech32)
+}
+
 impl Reducer {
+    fn stake_or_address_from_address(&self, address: &Address) -> String {
+        match address {
+            Address::Shelley(s) => match StakeAddress::try_from(s.clone()).ok() {
+                Some(x) => x.to_bech32().unwrap_or(x.to_hex()),
+                _ => address.to_bech32().unwrap_or(address.to_string()),
+            },
+
+            Address::Byron(_) => address.to_bech32().unwrap_or(address.to_string()),
+            Address::Stake(stake) => stake.to_bech32().unwrap_or(address.to_string()),
+        }
+
+    }
+
+    fn tx_state(
+        &mut self,
+        output: &mut super::OutputPort,
+        soa: &str,
+        tx_str: &str,
+        should_exist: bool,
+    ) {
+        match should_exist {
+            true => {
+                output.send(model::CRDTCommand::set_add(
+                    self.config.key_prefix.as_deref(),
+                    &soa,
+                    tx_str.to_string(),
+                ).into());
+            }
+
+            _ => {
+                output.send(model::CRDTCommand::set_remove(
+                    self.config.key_prefix.as_deref(),
+                    &soa,
+                    tx_str.to_string(),
+                ).into());
+
+            }
+
+        }
+
+    }
+
+    fn coin_state(
+        &mut self,
+        output: &mut super::OutputPort,
+        address: &str,
+        tx_str: &str,
+        lovelace_amt: &str,
+        should_exist: bool,
+    ) {
+        match should_exist {
+            true => {
+                output.send(model::CRDTCommand::set_add(
+                    self.config.key_prefix.as_deref(),
+                    tx_str,
+                    format!("{}/{}", address, lovelace_amt),
+                ).into());
+
+            }
+
+            _ => {
+                output.send(model::CRDTCommand::set_remove(
+                    self.config.key_prefix.as_deref(),
+                    tx_str,
+                    format!("{}/{}", address, lovelace_amt),
+                ).into());
+
+            }
+
+        }
+
+    }
+
+    fn token_state(
+        &mut self,
+        output: &mut super::OutputPort,
+        address: &str,
+        tx_str: &str,
+        policy_id: &str,
+        fingerprint: &str,
+        quantity: &str,
+        should_exist: bool,
+    ) {
+        match should_exist {
+            true => {
+                output.send(model::CRDTCommand::set_add(
+                    self.config.key_prefix.as_deref(),
+                    tx_str,
+                    format!("{}/{}/{}/{}", address, hex::encode(policy_id), fingerprint, quantity),
+                ).into());
+
+            }
+
+            _ => {
+                output.send(model::CRDTCommand::set_remove(
+                    self.config.key_prefix.as_deref(),
+                    tx_str,
+                    format!("{}/{}", address, quantity),
+                ).into());
+
+            }
+
+        }
+
+    }
+
     fn process_consumed_txo(
         &mut self,
         ctx: &model::BlockContext,
         input: &OutputRef,
         output: &mut super::OutputPort,
+        rollback: bool,
     ) -> Result<(), gasket::error::Error> {
         let utxo = ctx.find_utxo(input).apply_policy(&self.policy).or_panic()?;
 
@@ -37,13 +175,29 @@ impl Reducer {
             }
         }
 
-        let crdt = model::CRDTCommand::set_remove(
-            self.config.key_prefix.as_deref(),
-            &address,
-            input.to_string(),
-        );
+        if let Ok(raw_address) = &utxo.address() {
+            let soa = self.stake_or_address_from_address(raw_address);
+            self.tx_state(output, soa.as_str(), &format!("{}#{}", input.hash(), input.index()), rollback);
+            self.coin_state(output, raw_address.to_bech32().unwrap_or(raw_address.to_string()).as_str(), &format!("{}#{}", input.hash(), input.index()), utxo.lovelace_amount().to_string().as_str(), rollback);
+        }
 
-        output.send(crdt.into())
+        // Spend Native Tokens
+        for asset in utxo.non_ada_assets() {
+            if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
+                let asset_name = hex::encode(asset_name);
+
+                if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
+                    if !fingerprint.is_empty() {
+                        self.token_state(output, address.as_str(), format!("{}#{}", input.hash(), input.index()).as_str(), policy_id.to_string().as_str(), fingerprint.to_string().as_str(), quantity.to_string().as_str(), rollback);
+                    }
+
+                }
+
+            };
+
+        }
+
+        Ok(())
     }
 
     fn process_produced_txo(
@@ -52,23 +206,56 @@ impl Reducer {
         tx_output: &MultiEraOutput,
         output_idx: usize,
         output: &mut super::OutputPort,
+        rollback: bool,
     ) -> Result<(), gasket::error::Error> {
-        let tx_hash = tx.hash();
-        let address = tx_output.address().map(|addr| addr.to_string()).or_panic()?;
+        if let Ok(raw_address) = &tx_output.address() {
+            let tx_hash = tx.hash();
+            let tx_address = raw_address.to_bech32().unwrap_or(raw_address.to_string());
 
-        if let Some(addresses) = &self.config.filter {
-            if let Err(_) = addresses.binary_search(&address) {
-                return Ok(());
+            if let Some(addresses) = &self.config.filter {
+                if let Err(_) = addresses.binary_search(&tx_address) {
+                    return Ok(());
+                }
+
             }
+
+            let soa = self.stake_or_address_from_address(raw_address);
+            self.tx_state(output, soa.as_str(), &format!("{}#{}", tx_hash, output_idx), !rollback);
+
+            if soa != tx_address {
+                // This is a hack because of my shitty legacy discord indexing being based off the stake key hash that is generated by cardano-address (what a trash lib to use in js-land)
+                // todo this might only be needed to lookup discord ids. in which case we need to strive to remove this and it will not be too bad. otherwise it will be very hard but still need to remove
+                let soa_to_address_cmd = model::CRDTCommand::any_write_wins(
+                    self.config.key_prefix.as_deref(),
+                    format!("s2a.{}", soa),
+                    tx_address.clone(),
+                );
+
+                output.send(soa_to_address_cmd.into());
+            }
+
+            self.coin_state(output, tx_address.as_str(), &format!("{}#{}", tx_hash, output_idx), tx_output.lovelace_amount().to_string().as_str(), !rollback);
+
+            // Advanced utxo info
+            for asset in tx_output.non_ada_assets() {
+                if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
+                    let asset_name = hex::encode(asset_name);
+                    let policy_id_str = policy_id.clone().to_string();
+
+                    if let Ok(fingerprint) = asset_fingerprint([policy_id_str.as_str(), asset_name.as_str()]) {
+                        if !fingerprint.is_empty() {
+                            self.token_state(output, tx_address.as_str(), format!("{}#{}", tx_hash, output_idx).as_str(), policy_id_str.as_str(), fingerprint.to_string().as_str(), quantity.to_string().as_str(), !rollback);
+                        }
+
+                    }
+
+                };
+
+            }
+
         }
 
-        let crdt = model::CRDTCommand::set_add(
-            self.config.key_prefix.as_deref(),
-            &address,
-            format!("{}#{}", tx_hash, output_idx),
-        );
-
-        output.send(crdt.into())
+        Ok(())
     }
 
     pub fn reduce_block<'b>(
@@ -78,18 +265,15 @@ impl Reducer {
         rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        if rollback {
-            return Ok(());
-        }
-
         for tx in block.txs().into_iter() {
             for consumed in tx.consumes().iter().map(|i| i.output_ref()) {
-                self.process_consumed_txo(&ctx, &consumed, output)?;
+                self.process_consumed_txo(&ctx, &consumed, output, rollback).expect("TODO: panic message");
             }
 
             for (idx, produced) in tx.produces() {
-                self.process_produced_txo(&tx, &produced, idx, output)?;
+                self.process_produced_txo(&tx, &produced, idx, output, rollback).expect("TODO: panic message");
             }
+
         }
 
         Ok(())
@@ -105,4 +289,5 @@ impl Config {
 
         super::Reducer::UtxoByAddress(reducer)
     }
+
 }
