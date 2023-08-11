@@ -51,8 +51,8 @@ const CIP25_META_NFT: u64 = 721;
 const CIP27_META_ROYALTIES: u64 = 777;
 
 #[inline]
-fn kv_pairs_to_hashmap(kv_pairs: &KeyValuePairs<Metadatum, Metadatum>
-) -> serde_json::Map<String, Value> {
+fn kv_pairs_to_hashmap(kv_pairs: &KeyValuePairs<Metadatum, Metadatum>) -> serde_json::Map<String, Value> {
+    #[inline]
     fn metadatum_to_value(m: &Metadatum) -> Value {
         match m {
             Metadatum::Int(int_value) => {
@@ -85,28 +85,25 @@ fn kv_pairs_to_hashmap(kv_pairs: &KeyValuePairs<Metadatum, Metadatum>
 }
 
 impl Reducer {
-    #[inline]
     fn find_metadata_policy_assets(&self, metadata: &Metadatum, target_policy_id: &str) -> Option<KeyValuePairs<Metadatum, Metadatum>> {
-        if let Metadatum::Map(kv) = metadata {
-            for (policy_label, policy_contents) in kv.iter() {
-                if let Metadatum::Text(policy_label) = policy_label {
-                    if policy_label == target_policy_id {
-                        if let Metadatum::Map(policy_inner_map) = policy_contents {
-                            return Some(policy_inner_map.clone());
+        match metadata {
+            Metadatum::Map(kv) => {
+                for (policy_label, policy_contents) in kv.iter() {
+                    if let Metadatum::Text(policy_label) = policy_label {
+                        if policy_label == target_policy_id {
+                            if let Metadatum::Map(policy_inner_map) = policy_contents {
+                                return Some(policy_inner_map.clone());
+                            }
                         }
-
                     }
-
                 }
 
-            }
-
+                None
+            },
+            _ => None
         }
-
-        None
     }
 
-    #[inline]
     fn asset_fingerprint(&self, data_list: [&str; 2]) -> Result<String, bech32::Error> {
         let combined_parts = data_list.join("");
         let raw = hex::decode(combined_parts).unwrap();
@@ -119,7 +116,6 @@ impl Reducer {
         bech32::encode("asset", base32_combined, Variant::Bech32)
     }
 
-    #[inline]
     fn get_asset_label (&self, l: Metadatum) -> Result<String, &str> {
         match l {
             Metadatum::Text(l) => Ok(l),
@@ -132,7 +128,6 @@ impl Reducer {
 
     }
 
-    #[inline]
     fn get_wrapped_metadata_fragment(&self, cip: u64, asset_name: String, policy_id: String, asset_metadata: &KeyValuePairs<Metadatum, Metadatum>) -> Metadata {
         let asset_map = KeyValuePairs::from(
             vec![(Metadatum::Text(asset_name), Metadatum::Map(asset_metadata.clone())); 1]
@@ -150,7 +145,6 @@ impl Reducer {
         Metadata::from(meta_wrapper_721)
     }
 
-    #[inline]
     fn get_metadata_fragment(&self, asset_name: String, policy_id: String, asset_metadata: &KeyValuePairs<Metadatum, Metadatum>, cip: u64) -> String {
         let mut std_wrap_map = serde_json::Map::new();
         let mut policy_wrap_map = serde_json::Map::new();
@@ -164,7 +158,6 @@ impl Reducer {
         serde_json::to_string(&std_wrap_map).unwrap()
     }
 
-    #[inline]
     fn extract_and_aggregate_cip_metadata(
         &self,
         output: &mut super::OutputPort,
@@ -201,7 +194,6 @@ impl Reducer {
                             let cbor_enc = metadata_final.encode_fragment().unwrap_or(vec![]);
                             String::from_utf8(cbor_enc).unwrap_or("".to_string())
                         },
-
                     };
 
                     if !meta_payload.is_empty() {
@@ -283,6 +275,7 @@ impl Reducer {
         let mut assets_minted_map: HashMap<String, bool> = HashMap::new();
         let metadata = tx.metadata();
 
+        // Search for typical minting metadata
         if let Some(safe_mint) = tx.mint().as_alonzo() {
             for (policy_id, assets) in safe_mint.iter() {
                 let policy_id_str = hex::encode(policy_id);
@@ -351,12 +344,10 @@ impl Reducer {
             if tx.metadata().as_alonzo().iter().any(|meta| meta.iter().any(|(key, _)| *key == CIP25_META_NFT || *key == CIP27_META_ROYALTIES)) {
                 self.send(block, tx, rollback, output)?;
             }
-
         }
 
         Ok(())
     }
-
 }
 
 impl Config {
