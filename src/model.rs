@@ -46,6 +46,7 @@ impl BlockContext {
             .get(&key.to_string())
             .ok_or_else(|| Error::missing_utxo(key))?;
 
+        log::warn!("about to be acutally cool {} {}", key.to_string(), cbor.len());
         MultiEraOutput::decode(*era, cbor).map_err(crate::Error::cbor)
     }
 

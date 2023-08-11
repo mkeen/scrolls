@@ -205,7 +205,7 @@ impl gasket::runtime::Worker for Worker {
             self.output
                 .send(model::RawBlockPayload::roll_back(block))?;
 
-            // evaluate if we should finalize the thread according to config
+            // Finalize if rollbacks are exhausted
             if after_pop_len == 0 {
                 return Ok(gasket::runtime::WorkOutcome::Done);
             }
