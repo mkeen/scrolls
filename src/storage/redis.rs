@@ -1,21 +1,24 @@
 use std::{str::FromStr, time::Duration};
+use futures::{TryFutureExt, TryStreamExt};
 
 use gasket::{
     error::AsWorkError,
     runtime::{spawn_stage, WorkOutcome},
 };
+use log::{error, warn};
 
-use redis::{Commands, ToRedisArgs};
+use redis::{Cmd, Commands, ConnectionLike, ToRedisArgs};
 use serde::Deserialize;
 
 use crate::{bootstrap, crosscut, model};
+use crate::model::{Member, Value};
 
 type InputPort = gasket::messaging::TwoPhaseInputPort<model::CRDTCommand>;
 
 impl ToRedisArgs for model::Value {
     fn write_redis_args<W>(&self, out: &mut W)
-    where
-        W: ?Sized + redis::RedisWrite,
+        where
+            W: ?Sized + redis::RedisWrite,
     {
         match self {
             model::Value::String(x) => x.write_redis_args(out),
@@ -233,26 +236,20 @@ impl gasket::runtime::Worker for Worker {
                     .set(key, value)
                     .or_restart()?;
             }
-            model::CRDTCommand::PNCounter(key, value) => {
-                log::debug!("increasing counter [{}], by [{}]", key, value);
+            model::CRDTCommand::PNCounter(key, delta) => {
+                log::debug!("increasing counter [{}], by [{}]", key, delta);
 
                 self.connection
                     .as_mut()
                     .unwrap()
-                    .incr(key, value)
-                    .or_restart()?;
-            }
-            model::CRDTCommand::HashSetValue(key, member, value) => {
-                log::debug!("setting hash key {} member {}", key, member);
-
-                self.connection
-                    .as_mut()
-                    .unwrap()
-                    .hset(key, member, value)
+                    .req_command(&Cmd::new()
+                        .arg("INCRBYFLOAT")
+                        .arg(key)
+                        .arg(delta.to_string()))
                     .or_restart()?;
             }
             model::CRDTCommand::HashSetMulti(key, members, values) => {
-                log::debug!("setting hash multi on key {} for {} members", key, members.len());
+                log::debug!("setting hash multi on key {} for {} members and {} values", key, members.len(), values.len());
 
                 let mut tuples: Vec<(Member, Value)> = vec![];
                 for (index, member) in members.iter().enumerate() {
@@ -265,13 +262,27 @@ impl gasket::runtime::Worker for Worker {
                     .hset_multiple(key, &tuples)
                     .or_restart()?;
             }
-            model::CRDTCommand::HashCounter(key, member, delta) => {
-                log::debug!("increasing hash key {} member {} by {}", key, member, delta);
+            model::CRDTCommand::HashSetValue(key, member, value) => {
+                log::debug!("setting hash key {} member {}", key, member);
 
                 self.connection
                     .as_mut()
                     .unwrap()
-                    .hincr(key, member, delta)
+                    .hset(key, member, value)
+                    .or_restart()?;
+            }
+            model::CRDTCommand::HashCounter(key, member, delta) => {
+                log::debug!("increasing hash key {} member {} by {}", key.clone(), member.clone(), delta);
+
+                self.connection
+                    .as_mut()
+                    .unwrap()
+                    .req_command(&Cmd::new()
+                        .arg("HINCRBYFLOAT")
+                        .arg(key.clone())
+                        .arg(member.clone())
+                        .arg(delta.to_string())
+                    )
                     .or_restart()?;
             }
             model::CRDTCommand::HashUnsetKey(key, member) => {
@@ -283,9 +294,17 @@ impl gasket::runtime::Worker for Worker {
                     .hdel(member, key)
                     .or_restart()?;
             }
+            model::CRDTCommand::UnsetKey(key) => {
+                log::debug!("deleting key {}", key);
+
+                self.connection
+                    .as_mut()
+                    .unwrap()
+                    .del(key)
+                    .or_restart()?;
+            }
             model::CRDTCommand::BlockFinished(point) => {
                 let cursor_str = crosscut::PointArg::from(point).to_string();
-
                 self.connection
                     .as_mut()
                     .unwrap()
@@ -298,7 +317,6 @@ impl gasket::runtime::Worker for Worker {
                     &cursor_str
                 );
 
-                // end redis transaction
                 redis::cmd("EXEC")
                     .query(self.connection.as_mut().unwrap())
                     .or_restart()?;
