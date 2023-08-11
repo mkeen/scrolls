@@ -32,7 +32,10 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn boostrapper(self, policy: &crosscut::policies::RuntimePolicy, blocks: &crosscut::blocks::Config) -> Bootstrapper {
+    pub fn boostrapper(mut self, policy: &crosscut::policies::RuntimePolicy, blocks: &crosscut::blocks::Config) -> Bootstrapper {
+        self.consumed_ring_path = blocks.consumed_ring_path.clone();
+        self.produced_ring_path = blocks.produced_ring_path.clone();
+
         Bootstrapper {
             config: self,
             policy: policy.clone(),
