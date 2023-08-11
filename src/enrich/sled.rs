@@ -32,7 +32,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn boostrapper(self, policy: &crosscut::policies::RuntimePolicy) -> Bootstrapper {
+    pub fn boostrapper(self, policy: &crosscut::policies::RuntimePolicy, blocks: &crosscut::blocks::Config) -> Bootstrapper {
         Bootstrapper {
             config: self,
             policy: policy.clone(),

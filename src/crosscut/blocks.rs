@@ -15,13 +15,23 @@ pub struct RollbackData {
 #[serde(tag = "type")]
 pub struct Config {
     pub db_path: String,
+    pub consumed_ring_path: String,
+    pub produced_ring_path: String,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
-            db_path: "/data/sled_default1".to_string()
+            db_path: "/opt/scrolls/block_buffer".to_string(),
+            consumed_ring_path: "/opt/scrolls/consumed_buffer".to_string(),
+            produced_ring_path: "/opt/scrolls/produced_buffer".to_string(),
         }
+    }
+}
+
+impl From<Config> for RollbackData {
+    fn from(config: Config) -> Self {
+        RollbackData::open_db(config)
     }
 }
 

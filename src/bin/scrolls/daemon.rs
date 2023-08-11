@@ -105,14 +105,15 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
         .map_err(|err| scrolls::Error::ConfigError(format!("{:?}", err)))?;
 
     let chain = config.chain.unwrap_or_default().into();
-    let blocks = crosscut::blocks::RollbackData::open_db(config.blocks.unwrap_or_default());
+    let block_config = config.blocks.unwrap_or_default();
+    let blocks = block_config.clone().into();
     let policy = config.policy.unwrap_or_default().into();
 
     let source = config
         .source
         .bootstrapper(&chain, &blocks, &config.intersect, &config.finalize, &policy);
 
-    let enrich = config.enrich.unwrap_or_default().bootstrapper(&policy);
+    let enrich = config.enrich.unwrap_or_default().bootstrapper(&policy, &block_config);
 
     let reducer = reducers::Bootstrapper::new(config.reducers, &chain, &policy);
 
