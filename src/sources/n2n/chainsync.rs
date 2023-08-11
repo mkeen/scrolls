@@ -197,14 +197,16 @@ impl gasket::runtime::Worker for Worker {
             false => self.await_next()?,
         };
 
+        let starting_len = self.blocks.len();
+
         // See if we need to roll back
         if let Some(block) = self.blocks.rollback_pop() {
-            let starting_len = self.blocks.len();
+            let after_pop_len = self.blocks.len();
             self.output
                 .send(model::RawBlockPayload::roll_back(block))?;
 
             // evaluate if we should finalize the thread according to config
-            if crosscut::should_finalize(&self.finalize, self.chain_tip) {
+            if after_pop_len == 0 {
                 return Ok(gasket::runtime::WorkOutcome::Done);
             }
 
