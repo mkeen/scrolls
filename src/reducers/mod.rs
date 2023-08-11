@@ -259,7 +259,7 @@ impl Reducer {
             #[cfg(feature = "unstable")]
             Reducer::AssetMetadata(x) => x.reduce_block(block, rollback, output),
             #[cfg(feature = "unstable")]
-            Reducer::PolicyAssetsMoved(x) => x.reduce_block(block, ctx, rollback, output),
+            Reducer::PolicyAssetsMoved(x) => x.reduce_block(block, output),
         }
     }
 }

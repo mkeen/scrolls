@@ -16,7 +16,7 @@ use serde_json::{Value};
 use hex::{self};
 
 use crate::{crosscut, model};
-use crate::model::CRDTCommand;
+use crate::model::{CRDTCommand, Delta};
 
 #[derive(Copy, Clone, Deserialize, Serialize)]
 pub enum Projection {
@@ -164,7 +164,8 @@ impl Reducer {
         policy_map: &Metadatum,
         policy_id_str: String,
         asset_name_str: String,
-        slot_no: u64
+        slot_no: u64,
+        rollback: bool,
     ) {
         let prefix = self.config.key_prefix.as_deref().unwrap_or("m");
         let projection = self.config.projection.unwrap_or_default();
@@ -197,22 +198,38 @@ impl Reducer {
 
                     if !meta_payload.is_empty() {
                         if should_store_royalty_metadata && cip == CIP27_META_ROYALTIES {
-                            output.send(CRDTCommand::LastWriteWins(
-                                format!("{}.{}", prefix, policy_id_str.clone()),
-                                meta_payload.clone().into(),
-                                timestamp,
-                            ).into());
-
+                            if !rollback {
+                                output.send(CRDTCommand::LastWriteWins(
+                                    format!("{}.{}", prefix, policy_id_str.clone()),
+                                    meta_payload.clone().into(),
+                                    timestamp,
+                                ).into());
+                            } else {
+                                output.send(CRDTCommand::SortedSetRemove(
+                                    format!("{}.{}", prefix, policy_id_str.clone()),
+                                    meta_payload.clone().into(),
+                                    Delta::from(timestamp as i64),
+                                ).into());
+                            }
                         }
 
                         if should_keep_historical_metadata {
-                            output.send(CRDTCommand::LastWriteWins(
-                                format!("{}.{}", prefix, fingerprint_str.clone()),
-                                meta_payload.clone().into(),
-                                timestamp,
-                            ).into());
+                            if !rollback {
+                                output.send(CRDTCommand::LastWriteWins(
+                                    format!("{}.{}", prefix, fingerprint_str.clone()),
+                                    meta_payload.clone().into(),
+                                    timestamp,
+                                ).into());
+                            } else {
+                                output.send(CRDTCommand::SortedSetRemove(
+                                    format!("{}.{}", prefix, fingerprint_str.clone()),
+                                    meta_payload.clone().into(),
+                                    timestamp as i64,
+                                ).into());
+                            }
 
                         } else {
+                            // Can't roll this back with the way it currently works
                             output.send(CRDTCommand::AnyWriteWins(
                                 format!("{}.{}", prefix, fingerprint_str.clone()),
                                 model::Value::String(meta_payload.clone()),
@@ -226,23 +243,18 @@ impl Reducer {
                                 fingerprint_str.clone().into(),
                                 timestamp,
                             ).into());
-
                         }
-
                     }
-
                 }
-
             }
-
         }
-
     }
 
     fn send(
         &mut self,
         block: &MultiEraBlock,
         tx: &MultiEraTx,
+        rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         if let Some(safe_mint) = tx.mint().as_alonzo() {
@@ -267,20 +279,14 @@ impl Reducer {
                                         policy_id_str.to_owned(),
                                         asset_name_str.to_owned(),
                                         block.slot().to_owned(),
+                                        rollback,
                                     );
-
                                 }
-
                             }
-
                         }
-
                     }
-
                 }
-
             }
-
         }
 
         Ok(())
@@ -292,18 +298,13 @@ impl Reducer {
         rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        if rollback {
-            return Ok(());
-        }
-
         for tx in &block.txs() {
             // Make sure the TX is worth processing for the use-case (metadata extraction). It should have minted at least one asset with the CIP25_META key present in metadata.
             // Currently this will send thru a TX that is just a burn with no mint, but it will be handled in the reducer.
             // Todo: could be cleaner using a filter
             if tx.mint().len() > 0 && tx.metadata().as_alonzo().iter().any(|meta| meta.iter().any(|(key, _)| *key == CIP25_META_NFT || *key == CIP27_META_ROYALTIES)) {
-                self.send(block, tx, output)?;
+                self.send(block, tx, rollback, output)?;
             }
-
         }
 
         Ok(())
