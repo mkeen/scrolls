@@ -134,7 +134,7 @@ fn fetch_referenced_utxo<'a>(
     utxo_ref: &OutputRef,
 ) -> Result<Option<(OutputRef, Era, Vec<u8>)>, crate::Error> {
     if let Some(ivec) = db
-        .get(utxo_ref.to_string())
+        .get(utxo_ref.to_string().as_bytes())
         .map_err(crate::Error::storage)?
     {
         let SledTxValue(era, cbor) = ivec.try_into().map_err(crate::Error::storage)?;
@@ -230,6 +230,7 @@ impl Worker {
 
         for m in matches? {
             if let Some((key, era, cbor)) = m {
+                warn!("about do be cool");
                 ctx.import_ref_output(&key, era, cbor);
                 self.matches_counter.inc(1);
             } else {
