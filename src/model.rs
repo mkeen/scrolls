@@ -47,8 +47,9 @@ impl BlockContext {
             .ok_or_else(|| Error::missing_utxo(key))?;
 
         let out = MultiEraOutput::decode(*era, cbor).map_err(crate::Error::cbor);
+        let out2 = MultiEraOutput::decode(*era, cbor).map_err(crate::Error::cbor);
         log::warn!("about to be acutally cool {} {} {}", key.to_string(), cbor.len(), out.unwrap().address().unwrap().to_string());
-        out
+        out2
 
     }
 
