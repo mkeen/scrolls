@@ -198,19 +198,34 @@ impl Reducer {
 
                     if !meta_payload.is_empty() {
                         if should_store_royalty_metadata && cip == CIP27_META_ROYALTIES {
-                            if !rollback {
-                                output.send(CRDTCommand::LastWriteWins(
-                                    format!("{}.r.{}", prefix, policy_id_str.clone()),
-                                    meta_payload.clone().into(),
-                                    timestamp,
-                                ).into());
+                            if should_keep_historical_metadata {
+                                if !rollback {
+                                    output.send(CRDTCommand::LastWriteWins(
+                                        format!("{}.r.{}", prefix, policy_id_str.clone()),
+                                        meta_payload.clone().into(),
+                                        timestamp,
+                                    ).into());
+                                } else {
+                                    output.send(CRDTCommand::SortedSetRemove(
+                                        format!("{}.r.{}", prefix, policy_id_str.clone()),
+                                        meta_payload.clone().into(),
+                                        Delta::from(timestamp as i64),
+                                    ).into());
+                                }
+
                             } else {
-                                output.send(CRDTCommand::SortedSetRemove(
-                                    format!("{}.r.{}", prefix, policy_id_str.clone()),
-                                    meta_payload.clone().into(),
-                                    Delta::from(timestamp as i64),
-                                ).into());
+                                if !rollback {
+                                    output.send(CRDTCommand::AnyWriteWins(
+                                        format!("{}.r.{}", prefix, policy_id_str.clone()),
+                                        meta_payload.clone().into()
+                                    ).into());
+                                } else {
+                                    // output.send(CRDTCommand::UnsetKey(
+                                    //     format!("{}.r.{}", prefix, policy_id_str.clone())
+                                    // ).into());
+                                }
                             }
+
                         } else {
                             if should_keep_historical_metadata {
                                 if !rollback {
