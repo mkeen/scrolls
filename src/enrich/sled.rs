@@ -370,8 +370,9 @@ impl gasket::runtime::Worker for Worker {
                 self.remove_produced_utxos(db, produced_ring, &txs).expect("todo: panic error");
                 self.replace_consumed_utxos(db, consumed_ring, &txs).expect("todo: panic error");
 
-                db.flush().expect("todo: panic error");
                 let ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
+
+                warn!("rolling back here {}", cbor.len());
                 self.output.send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
             }
         };
