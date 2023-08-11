@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::ops::Deref;
 
 use bech32::{ToBase32, Variant};
@@ -272,9 +273,10 @@ impl Reducer {
         rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        if let Some(safe_mint) = tx.mint().as_alonzo() {
-            let metadata = tx.metadata();
+        let mut assets_minted_map: HashMap<String, bool> = HashMap::new();
+        let metadata = tx.metadata();
 
+        if let Some(safe_mint) = tx.mint().as_alonzo() {
             for (policy_id, assets) in safe_mint.iter() {
                 let policy_id_str = hex::encode(policy_id);
                 for (asset_name, quantity) in assets.iter() {
@@ -284,6 +286,8 @@ impl Reducer {
 
                     if let Ok(asset_name_str) = String::from_utf8(asset_name.to_vec()) {
                         if !policy_id_str.is_empty() {
+                            assets_minted_map.insert(format!("{}{}", policy_id_str, asset_name_str), true);
+
                             for supported_metadata_cip in vec![CIP25_META_NFT, CIP27_META_ROYALTIES] {
                                 if let Some(policy_map) = metadata.find(MetadatumLabel::from(supported_metadata_cip)) {
                                     // Todo.. extract asset metadata here and pass into extract
@@ -304,6 +308,30 @@ impl Reducer {
             }
         }
 
+        // Search for CIP-54 matched tags
+        for (_, tx_output) in tx.produces() {
+            for output_asset in tx_output.non_ada_assets() {
+                let policy_id = output_asset.policy_hex();
+                let asset_name = output_asset.ascii_name();
+                if let (Some(policy_id), Some(asset_name)) = (policy_id, asset_name) {
+                    // Only modify metadata if this asset has not been minted in this tx
+                    if let None = assets_minted_map.get(format!("{}{}", policy_id, asset_name).as_str()) {
+                        if let Some(policy_map) = metadata.find(MetadatumLabel::from(CIP25_META_NFT)) {
+                            self.extract_and_aggregate_cip_metadata(
+                                output,
+                                CIP25_META_NFT,
+                                policy_map,
+                                policy_id.to_owned(),
+                                asset_name.to_owned(),
+                                block.slot().to_owned(),
+                                rollback,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -314,12 +342,10 @@ impl Reducer {
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
         for tx in &block.txs() {
-            // Make sure the TX is worth processing for the use-case (metadata extraction). It should have minted at least one asset with the CIP25_META key present in metadata.
-            // Currently this will send thru a TX that is just a burn with no mint, but it will be handled in the reducer.
-            // Todo: could be cleaner using a filter
-            if tx.mint().len() > 0 && tx.metadata().as_alonzo().iter().any(|meta| meta.iter().any(|(key, _)| *key == CIP25_META_NFT || *key == CIP27_META_ROYALTIES)) {
+            if tx.metadata().as_alonzo().iter().any(|meta| meta.iter().any(|(key, _)| *key == CIP25_META_NFT || *key == CIP27_META_ROYALTIES)) {
                 self.send(block, tx, rollback, output)?;
             }
+
         }
 
         Ok(())
