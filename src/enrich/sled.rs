@@ -164,14 +164,14 @@ impl Worker {
 
         for tx in txs.iter() {
             for (idx, output) in tx.produces() {
-                let key: IVec = format!("{}#{}", tx.hash(), idx).as_bytes().into();
+                let key = format!("{}#{}", tx.hash(), idx);
 
                 let era = tx.era().into();
                 let body = output.encode();
                 let value: IVec = SledTxValue(era, body).try_into()?;
 
-                rollback_insert_batch.insert(key.clone(), IVec::default());
-                insert_batch.insert(key, value)
+                rollback_insert_batch.insert(key.as_bytes(), IVec::default());
+                insert_batch.insert(key.as_bytes(), value)
             }
         }
 
