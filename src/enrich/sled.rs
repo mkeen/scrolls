@@ -384,6 +384,7 @@ impl gasket::runtime::Worker for Worker {
     }
 
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
+        log::error!("db opening");
         let db = sled::open(&self.config.db_path).or_retry()?;
         let consumed_ring = sled::open(self.config.consumed_ring_path.clone().unwrap()).or_retry()?;
         let produced_ring = sled::open(self.config.produced_ring_path.clone().unwrap()).or_retry()?;
