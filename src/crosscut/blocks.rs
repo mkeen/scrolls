@@ -37,6 +37,7 @@ pub struct RollbackData {
 impl RollbackData {
     fn open_db(config: Config) -> Self {
         let db = sled::open(config.db_path).or_retry().unwrap();
+
         RollbackData {
             db_depth: Some(db.len() as usize), // o(n) to get the initial size, but should only be called once
             db: Some(db),

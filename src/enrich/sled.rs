@@ -145,6 +145,7 @@ fn fetch_referenced_utxo<'a>(
 #[inline]
 fn prune_tree(db: &sled::Db) {
     error!("pruning tree");
+
     if let Ok(size) = db.size_on_disk() {
         if size > 3000000 {
             if let Ok(Some((first_key, _))) = db.first() {
@@ -383,6 +384,8 @@ impl gasket::runtime::Worker for Worker {
         let db = sled::open(&self.config.db_path).or_retry()?;
         let consumed_ring = sled::open(self.config.consumed_ring_path.clone().unwrap()).or_retry()?;
         let produced_ring = sled::open(self.config.produced_ring_path.clone().unwrap()).or_retry()?;
+
+        log::error!("db opened");
 
         self.db = Some(db);
         self.consumed_ring = Some(consumed_ring);
