@@ -230,13 +230,16 @@ impl gasket::runtime::Worker for Worker {
                     }
                 }
                 Err(e) => {
+                    log::warn!("big time error")
                     return Err(gasket::error::Error::WorkPanic("rollback queue mismatch".to_string()));
                 }
             }
 
         } else {
+            log::warn!("working really");
             // see if we have points that already reached certain depth
             let ready = self.chain_buffer.pop_with_depth(self.min_depth);
+            log::warn!("popped chain");
             log::debug!("found {} points with required min depth", ready.len());
 
             // request download of blocks for confirmed points
