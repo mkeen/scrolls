@@ -150,6 +150,7 @@ fn prune_tree(db: &sled::Db) {
     let mut drop_keys_batch = sled::Batch::default();
 
     let mut count: u64 = 0;
+    let mut above_count: u64 = 0;
     while count < 200000 {
         match db.iter().next() {
             None => continue,
@@ -157,8 +158,10 @@ fn prune_tree(db: &sled::Db) {
                 match next {
                     Ok((key, _)) => {
                         count += 1;
-                        if count > 100000 {
+                        if count <= 100000 {
                             keys_to_drop.push(key)
+                        } else {
+                            above_count += 1;
                         }
                     }
                     Err(_) => continue
@@ -167,15 +170,18 @@ fn prune_tree(db: &sled::Db) {
         }
     }
 
-    for k in keys_to_drop.clone() {
-        drop_keys_batch.remove(k)
+    if above_count >= 100000 {
+        for k in keys_to_drop.clone() {
+            drop_keys_batch.remove(k)
+        }
+
+        log::warn!("dropping {} keys", keys_to_drop.len());
+
+        db.apply_batch(drop_keys_batch).expect("panic");
+
+        error!("done pruning tree")
     }
 
-    log::warn!("dropping {} keys", keys_to_drop.len());
-
-    db.apply_batch(drop_keys_batch).expect("panic");
-
-    error!("done pruning tree")
 }
 
 impl Worker {
