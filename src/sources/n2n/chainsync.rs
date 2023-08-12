@@ -204,6 +204,8 @@ impl gasket::runtime::Worker for Worker {
 
         let rollback_queue_length = self.blocks.rollback_queue_len();
 
+        log::warn!("working");
+
         if rollback_queue_length > 0 {
             log::warn!("rollback attempting");
 
