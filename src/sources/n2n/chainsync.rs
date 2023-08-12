@@ -87,14 +87,14 @@ impl Worker {
         let point = Point::Specific(header.slot(), header.hash().to_vec());
 
         // track the new point in our memory buffer
-        log::debug!("rolling forward to point {:?}", point);
+        log::warn!("rolling forward to point {:?}", point);
         self.chain_buffer.roll_forward(point);
 
         Ok(())
     }
 
     fn on_rollback(&mut self, point: &Point) -> Result<(), gasket::error::Error> {
-        log::debug!("rolling block to point {:?}", point);
+        log::warn!("rolling block to point {:?}", point);
 
         match self.chain_buffer.roll_back(point) {
             chainsync::RollbackEffect::Handled => {
