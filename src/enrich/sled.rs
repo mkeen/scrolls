@@ -174,7 +174,7 @@ fn prune_tree(db: &sled::Db) {
     log::warn!("dropping {} keys", keys_to_drop.len());
 
     db.apply_batch(drop_keys_batch).expect("panic");
-    log::warn!("dropping {} keys", keys_to_drop.len());
+    log::warn!("dropped {} keys", keys_to_drop.len());
 
     error!("done pruning tree")
 }
