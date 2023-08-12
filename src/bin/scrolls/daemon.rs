@@ -99,6 +99,7 @@ fn shutdown(pipeline: bootstrap::Pipeline) {
 }
 
 pub fn run(args: &Args) -> Result<(), scrolls::Error> {
+    log::error!("LOGGGGGGGGGGING RUN");
     console::initialize(&args.console);
 
     let config = ConfigRoot::new(&args.config)

@@ -146,7 +146,7 @@ fn prune_tree(db: &sled::Db) {
     if let Ok(size) = db.size_on_disk() {
         if size > 3000000 {
             if let Ok(Some((first_key, _))) = db.first() {
-                db.remove(first_key).expect("todo: panic");
+                db.pop_max(first_key).expect("todo: panic");
             }
         }
     }
