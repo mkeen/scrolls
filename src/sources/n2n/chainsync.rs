@@ -230,7 +230,7 @@ impl gasket::runtime::Worker for Worker {
                     }
                 }
                 Err(e) => {
-                    log::warn!("big time error")
+                    log::warn!("big time error");
                     return Err(gasket::error::Error::WorkPanic("rollback queue mismatch".to_string()));
                 }
             }
