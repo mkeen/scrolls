@@ -35,6 +35,68 @@ pub struct RollbackData {
 }
 
 impl RollbackData {
+    fn open_db(config: Config) -> Self {
+        let db = sled::open(config.db_path).or_retry().unwrap();
+        RollbackData {
+            db_depth: Some(db.len() as usize), // o(n) to get the initial size, but should only be called once
+            db: Some(db),
+            queue: Vec::default(),
+        }
+    }
+
+    pub fn insert_block(&mut self, point: &Point, block: &Vec<u8>) {
+        let key = point.slot_or_default();
+        let db = self.get_db_ref();
+        db.insert(key.to_string().as_bytes(), sled::IVec::from(block.clone())).expect("todo map storage error");
+
+        self.db_depth_up();
+        if self.drop_old_block_if_buffer_max() {
+            self.db_depth_down();
+        }
+    }
+
+    pub fn get_block_at_point(&self, point: &Point) -> Option<Vec<u8>> {
+        match self.get_db_ref().get(point.slot_or_default().to_string().as_bytes()) {
+            Ok(block) => match block {
+                None => None,
+                Some(block) => Some(block.to_vec()),
+            },
+            Err(_) => None,
+        }
+    }
+
+    pub fn close(&self) {
+        self.get_db_ref().flush().unwrap_or_default();
+    }
+
+    pub fn enqueue_rollback_batch(&mut self, from: &Point) -> bool {
+        let blocks = self.get_rollback_range(from);
+
+        let emt: Vec<u8> = Vec::default();
+
+        match !blocks.is_empty() && !blocks.first().unwrap_or(&emt).is_empty() {
+            false => false,
+            true => {
+                self.queue.clear();
+                self.queue.extend(blocks);
+                true
+            }
+        }
+    }
+
+    pub fn rollback_pop(&mut self) -> Result<Option<sled::IVec>, Error> {
+        match self.queue.pop() {
+            None => Ok(None),
+            Some(popped) => {
+                self.get_db_ref().remove(popped).map_err(Error::storage)
+            }
+        }
+    }
+
+    pub fn rollback_queue_len(&mut self) -> usize {
+        self.queue.len()
+    }
+
     fn get_db_ref(&self) -> &sled::Db {
         self.db.as_ref().unwrap()
     }
@@ -66,47 +128,6 @@ impl RollbackData {
         db.apply_batch(clear_blocks).map_err(crate::Error::storage).expect("todo: map storage error");
 
         blocks_to_roll_back
-    }
-
-    fn open_db(config: Config) -> Self {
-        let db = sled::open(config.db_path).or_retry().unwrap();
-        RollbackData {
-            db_depth: Some(db.len() as usize), // o(n) to get the initial size, but should only be called once
-            db: Some(db),
-            queue: Vec::default(),
-        }
-    }
-
-    pub fn close(&self) -> sled::Result<usize> {
-        self.get_db_ref().flush()
-    }
-
-    pub fn enqueue_rollback_batch(&mut self, from: &Point) -> bool {
-        let blocks = self.get_rollback_range(from);
-
-        let emt: Vec<u8> = Vec::default();
-
-        match !blocks.is_empty() && !blocks.first().unwrap_or(&emt).is_empty() {
-            false => false,
-            true => {
-                self.queue.clear();
-                self.queue.extend(blocks);
-                true
-            }
-        }
-    }
-
-    pub fn rollback_pop(&mut self) -> Result<Option<sled::IVec>, Error> {
-        match self.queue.pop() {
-            None => Ok(None),
-            Some(popped) => {
-               self.get_db_ref().remove(popped).map_err(Error::storage)
-            }
-        }
-    }
-
-    pub fn rollback_queue_len(&mut self) -> usize {
-        self.queue.len()
     }
 
     fn drop_old_block_if_buffer_max(&mut self) -> bool {
@@ -146,24 +167,4 @@ impl RollbackData {
         return current_db_depth;
     }
 
-    pub fn insert_block(&mut self, point: &Point, block: &Vec<u8>) {
-        let key = point.slot_or_default();
-        let db = self.get_db_ref();
-        db.insert(key.to_string().as_bytes(), sled::IVec::from(block.clone())).expect("todo map storage error");
-
-        self.db_depth_up();
-        if self.drop_old_block_if_buffer_max() {
-            self.db_depth_down();
-        }
-    }
-
-    pub fn get_block_at_point(&self, point: &Point) -> Option<Vec<u8>> {
-        match self.get_db_ref().get(point.slot_or_default().to_string().as_bytes()) {
-            Ok(block) => match block {
-                None => None,
-                Some(block) => Some(block.to_vec()),
-            },
-            Err(_) => None,
-        }
-    }
 }
