@@ -134,6 +134,7 @@ impl RollbackData {
 
         let mut last_seen_slot = slot.clone().to_string();
         while let Some((next_key, next_block)) = db.get_gt(last_seen_slot.as_bytes()).unwrap() {
+            log::error!("looping");
             last_seen_slot = String::from_utf8(next_key.to_vec()).unwrap();
             clear_blocks.remove(next_key);
             blocks_to_roll_back.push(next_block.to_vec())
