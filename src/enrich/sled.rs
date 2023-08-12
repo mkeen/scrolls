@@ -158,7 +158,7 @@ fn prune_tree(db: &sled::Db) {
                 match next {
                     Ok((key, _)) => {
                         count += 1;
-                        if count <= 500000 {
+                        if count <= 5000000 {
                             keys_to_drop.push(key)
                         } else {
                             above_count += 1;
@@ -170,7 +170,7 @@ fn prune_tree(db: &sled::Db) {
         }
     }
 
-    if above_count >= 100000 {
+    if above_count >= 5000000 {
         for k in keys_to_drop.clone() {
             drop_keys_batch.remove(k)
         }
