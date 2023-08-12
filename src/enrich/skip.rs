@@ -73,6 +73,7 @@ impl gasket::runtime::Worker for Worker {
                 ))?;
             }
             model::RawBlockPayload::RollBack(cbor) => {
+                log::warn!("decided to sckip enrichment {}", cbor.len());
                 self.output
                     .send(model::EnrichedBlockPayload::roll_back(cbor, BlockContext::default()))?;
             }
