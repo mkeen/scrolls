@@ -69,6 +69,20 @@ impl RollbackData {
         self.get_db_ref().flush().unwrap_or_default();
     }
 
+    pub fn last_from(&self, key: &[u8]) -> Option<Vec<u8>> {
+        match self.get_db_ref().get_lt(key) {
+            Ok(result) => {
+                match result {
+                    Some((_, block)) => {
+                        Some(block.to_vec())
+                    },
+                    None => None
+                }
+            }
+            Err(_) => None
+        }
+    }
+
     pub fn enqueue_rollback_batch(&mut self, from: &Point) -> bool {
         let blocks = self.get_rollback_range(from);
 

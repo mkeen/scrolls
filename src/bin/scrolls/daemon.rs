@@ -129,7 +129,7 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
     }
 
     log::info!("Scrolls is stopping...");
-    
+
     shutdown(pipeline);
     blocks.close();
 

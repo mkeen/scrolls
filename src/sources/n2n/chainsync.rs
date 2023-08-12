@@ -102,7 +102,12 @@ impl Worker {
                 Ok(())
             }
             chainsync::RollbackEffect::OutOfScope => {
-                self.blocks.enqueue_rollback_batch(point);
+                if let block_before_rollback = self.blocks.last_from(point.slot_or_default().to_string().as_bytes()) {
+                    log::warn!("Found block to roll back");
+                    self.chain_buffer.roll_forward(point);
+                    self.blocks.enqueue_rollback_batch(point);
+                }
+
                 Ok(())
             }
         }
@@ -227,6 +232,7 @@ impl gasket::runtime::Worker for Worker {
                     return Err(gasket::error::Error::WorkPanic("rollback queue mismatch".to_string()));
                 }
             }
+
         } else {
             // see if we have points that already reached certain depth
             let ready = self.chain_buffer.pop_with_depth(self.min_depth);
