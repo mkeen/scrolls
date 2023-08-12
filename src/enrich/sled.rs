@@ -4,6 +4,7 @@ use gasket::{
     error::AsWorkError,
     runtime::{spawn_stage, WorkOutcome},
 };
+use log::error;
 
 use pallas::{
     codec::minicbor,
@@ -143,6 +144,7 @@ fn fetch_referenced_utxo<'a>(
 
 #[inline]
 fn prune_tree(db: &sled::Db) {
+    error!("pruning tree");
     if let Ok(size) = db.size_on_disk() {
         if size > 3000000 {
             if let Ok(Some((first_key, _))) = db.first() {
@@ -150,6 +152,7 @@ fn prune_tree(db: &sled::Db) {
             }
         }
     }
+    error!("done pruning tree")
 }
 
 impl Worker {
