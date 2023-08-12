@@ -1,4 +1,4 @@
-use pallas::ledger::traverse::MultiEraHeader;
+use pallas::ledger::traverse::{MultiEraBlock, MultiEraHeader};
 use pallas::network::miniprotocols::chainsync::HeaderContent;
 use pallas::network::miniprotocols::{blockfetch, chainsync, Point};
 
@@ -104,7 +104,6 @@ impl Worker {
             chainsync::RollbackEffect::OutOfScope => {
                 if let block_before_rollback = self.blocks.last_from(point.slot_or_default().to_string().as_bytes()) {
                     log::warn!("Found block to roll back");
-                    self.chain_buffer.roll_forward(point);
                     self.blocks.enqueue_rollback_batch(point);
                 }
 
