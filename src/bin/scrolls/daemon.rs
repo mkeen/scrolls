@@ -134,6 +134,8 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
 
     shutdown(pipeline);
 
+    log::error!("Scrolls has exited normally...");
+
     Ok(())
 }
 

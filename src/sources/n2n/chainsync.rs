@@ -4,6 +4,7 @@ use pallas::network::miniprotocols::{blockfetch, chainsync, Point};
 
 use gasket::error::AsWorkError;
 use pallas::network::multiplexer::StdChannel;
+use sled::IVec;
 
 use crate::sources::n2n::transport::Transport;
 use crate::{crosscut, model, sources::utils, storage, Error};
@@ -197,21 +198,35 @@ impl gasket::runtime::Worker for Worker {
             false => self.await_next()?,
         };
 
-        let starting_len = self.blocks.len();
+        let rollback_queue_length = self.blocks.rollback_queue_len();
 
-        // See if we need to roll back
-        if let Ok(Some(block)) = self.blocks.rollback_pop() {
-            log::warn!("rolling back block");
+        if rollback_queue_length > 0 {
+            log::warn!("rollback attempting");
 
-            let after_pop_len = self.blocks.len();
-            self.output
-                .send(model::RawBlockPayload::roll_back(block.to_vec()))?;
+            match self.blocks.rollback_pop() {
+                Ok(block) => {
+                    match block {
+                        None => {}
+                        Some(block) => {
+                            log::warn!("rolling back block");
 
-            // Finalize if rollbacks are exhausted
-            if after_pop_len == 0 {
-                return Ok(gasket::runtime::WorkOutcome::Done);
+                            let after_pop_len = self.blocks.rollback_queue_len();
+                            self.output
+                                .send(model::RawBlockPayload::roll_back(block.to_vec()))?;
+
+                            self.block_count.inc(1);
+
+                            // Finalize if rollbacks are exhausted
+                            if after_pop_len == 0 {
+                                return Ok(gasket::runtime::WorkOutcome::Done);
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    return Err(gasket::error::Error::WorkPanic("rollback queue mismatch".to_string()));
+                }
             }
-
         } else {
             // see if we have points that already reached certain depth
             let ready = self.chain_buffer.pop_with_depth(self.min_depth);
@@ -238,6 +253,7 @@ impl gasket::runtime::Worker for Worker {
                     return Ok(gasket::runtime::WorkOutcome::Done);
                 }
             }
+
         }
 
         Ok(gasket::runtime::WorkOutcome::Partial)

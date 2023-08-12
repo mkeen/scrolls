@@ -46,6 +46,8 @@ pub mod utxos_by_asset;
 pub mod asset_metadata;
 #[cfg(feature = "unstable")]
 pub mod policy_assets_moved;
+#[cfg(feature = "unstable")]
+pub mod multi_asset_balances;
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
@@ -214,6 +216,8 @@ pub enum Reducer {
     AssetMetadata(asset_metadata::Reducer),
     #[cfg(feature = "unstable")]
     PolicyAssetsMoved(policy_assets_moved::Reducer),
+    #[cfg(feature = "unstable")]
+    MultiAssetBalances(multi_asset_balances::Reducer),
 }
 
 impl Reducer {
@@ -260,6 +264,8 @@ impl Reducer {
             Reducer::AssetMetadata(x) => x.reduce_block(block, rollback, output),
             #[cfg(feature = "unstable")]
             Reducer::PolicyAssetsMoved(x) => x.reduce_block(block, output),
+            #[cfg(feature = "unstable")]
+            Reducer::MultiAssetBalances(x) => x.reduce_block(block, ctx, rollback, output),
         }
     }
 }

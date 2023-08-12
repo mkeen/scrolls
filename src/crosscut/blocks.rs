@@ -3,12 +3,6 @@ use pallas::network::miniprotocols::Point;
 use serde::{Deserialize, Serialize};
 use crate::Error;
 
-#[derive(Clone)]
-pub struct RollbackData {
-    db: Option<sled::Db>,
-    queue: Vec<Vec<u8>>,
-}
-
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct Config {
@@ -31,6 +25,13 @@ impl From<Config> for RollbackData {
     fn from(config: Config) -> Self {
         RollbackData::open_db(config)
     }
+}
+
+#[derive(Clone)]
+pub struct RollbackData {
+    db: Option<sled::Db>,
+    db_depth: Option<usize>,
+    queue: Vec<Vec<u8>>,
 }
 
 impl RollbackData {
@@ -67,9 +68,10 @@ impl RollbackData {
         blocks_to_roll_back
     }
 
-    pub fn open_db(config: Config) -> Self {
+    fn open_db(config: Config) -> Self {
         let db = sled::open(config.db_path).or_retry().unwrap();
         RollbackData {
+            db_depth: Some(db.len() as usize), // o(n) to get the initial size, but should only be called once
             db: Some(db),
             queue: Vec::default(),
         }
@@ -103,19 +105,15 @@ impl RollbackData {
         }
     }
 
-    pub fn len(&mut self) -> usize {
+    pub fn rollback_queue_len(&mut self) -> usize {
         self.queue.len()
     }
 
-    pub fn insert_block(&self, point: &Point, block: &Vec<u8>) -> usize {
-        let key = point.slot_or_default();
+    fn drop_old_block_if_buffer_max(&mut self) -> bool {
         let db = self.get_db_ref();
-        db.insert(key.to_string().as_bytes(), sled::IVec::from(block.clone())).expect("todo map storage error");
+        let mut dropped = false;
 
-        let current_len = db.size_on_disk().unwrap();
-
-        // Trim excess blocks
-        if current_len > 2000000 {
+        if self.db_depth.unwrap() > 50000 {
             let first = match db.first() {
                 Ok(first) => first,
                 Err(_) => None
@@ -123,10 +121,40 @@ impl RollbackData {
 
             if let Some((first, _)) = first {
                 db.remove(first).expect("todo: map storage error");
+                dropped = true;
             }
         }
 
-        db.flush().unwrap()
+        dropped
+    }
+
+    fn db_depth_down(&mut self) -> usize {
+        let mut current_db_depth = self.db_depth.unwrap();
+        if current_db_depth > 0 {
+            return current_db_depth - 1;
+        }
+
+        return current_db_depth;
+    }
+
+    fn db_depth_up(&mut self) -> usize {
+        let mut current_db_depth = self.db_depth.unwrap();
+        if current_db_depth > 0 {
+            return current_db_depth + 1;
+        }
+
+        return current_db_depth;
+    }
+
+    pub fn insert_block(&mut self, point: &Point, block: &Vec<u8>) {
+        let key = point.slot_or_default();
+        let db = self.get_db_ref();
+        db.insert(key.to_string().as_bytes(), sled::IVec::from(block.clone())).expect("todo map storage error");
+
+        self.db_depth_up();
+        if self.drop_old_block_if_buffer_max() {
+            self.db_depth_down();
+        }
     }
 
     pub fn get_block_at_point(&self, point: &Point) -> Option<Vec<u8>> {

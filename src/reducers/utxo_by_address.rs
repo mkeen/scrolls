@@ -224,7 +224,6 @@ impl Reducer {
 
             self.coin_state(output, tx_address.as_str(), &format!("{}#{}", tx_hash, output_idx), tx_output.lovelace_amount().to_string().as_str(), !rollback);
 
-            // Advanced utxo info
             for asset in tx_output.non_ada_assets() {
                 if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
                     let asset_name = hex::encode(asset_name);
