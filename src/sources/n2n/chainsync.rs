@@ -94,8 +94,6 @@ impl Worker {
     }
 
     fn on_rollback(&mut self, point: &Point) -> Result<(), gasket::error::Error> {
-        log::warn!("rolling block to point {:?}", point);
-
         match self.chain_buffer.roll_back(point) {
             chainsync::RollbackEffect::Handled => {
                 log::warn!("handled rollback within buffer {:?}", point);
@@ -113,9 +111,7 @@ impl Worker {
                             self.output
                                 .send(model::RawBlockPayload::roll_back(block))?;
                         }
-
                     }
-
                 }
 
                 Ok(())

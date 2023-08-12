@@ -167,11 +167,14 @@ fn prune_tree(db: &sled::Db) {
         }
     }
 
-    for k in keys_to_drop {
+    for k in keys_to_drop.clone() {
         drop_keys_batch.remove(k)
     }
 
+    log::warn!("dropping {} keys", keys_to_drop.len());
+
     db.apply_batch(drop_keys_batch).expect("panic");
+    log::warn!("dropping {} keys", keys_to_drop.len());
 
     error!("done pruning tree")
 }
@@ -214,7 +217,7 @@ impl Worker {
         let mut rollback_remove = sled::Batch::default();
 
         for tx in txs.iter() {
-            for (idx, output) in tx.produces() {
+            for (idx, _) in tx.produces() {
                 insert.remove(format!("{}#{}", tx.hash(), idx).as_bytes());
                 rollback_remove.remove(format!("{}#{}", tx.hash(), idx).as_bytes());
             }
@@ -346,8 +349,6 @@ impl gasket::runtime::Worker for Worker {
 
         match msg.payload {
             model::RawBlockPayload::RollForward(cbor) => {
-                log::warn!("i am being expected to roll forward");
-
                 let block = MultiEraBlock::decode(&cbor)
                     .map_err(crate::Error::cbor)
                     .apply_policy(&self.policy)
@@ -411,10 +412,6 @@ impl gasket::runtime::Worker for Worker {
 
         let produced_ring = sled::open(self.config.produced_ring_path.clone().unwrap()).or_retry()?;
         log::error!("db opened");
-
-
-
-        consumed_ring.pop_min();
 
         self.db = Some(db);
         self.consumed_ring = Some(consumed_ring);
