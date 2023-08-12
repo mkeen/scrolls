@@ -104,7 +104,13 @@ impl Worker {
             chainsync::RollbackEffect::OutOfScope => {
                 if let block_before_rollback = self.blocks.last_from(point.slot_or_default().to_string().as_bytes()) {
                     log::warn!("Found block to roll back");
-                    self.blocks.enqueue_rollback_batch(point);
+
+                    let blocks = self.blocks.enqueue_rollback_batch(point);
+                    for block in blocks {
+                        self.output
+                            .send(model::RawBlockPayload::roll_back(block))?;
+                    }
+
                 }
 
                 Ok(())
@@ -202,68 +208,32 @@ impl gasket::runtime::Worker for Worker {
             false => self.await_next()?,
         };
 
-        let rollback_queue_length = self.blocks.rollback_queue_len();
+        log::warn!("requesting block worker, hmmm");
 
-        log::warn!("working");
+        // see if we have points that already reached certain depth
+        let ready = self.chain_buffer.pop_with_depth(self.min_depth);
+        log::debug!("found {} points with required min depth", ready.len());
 
-        if rollback_queue_length > 0 {
-            log::warn!("rollback attempting");
+        // request download of blocks for confirmed points
+        for point in ready {
+            log::debug!("requesting block fetch for point {:?}", point);
 
-            match self.blocks.rollback_pop() {
-                Ok(block) => {
-                    match block {
-                        None => {}
-                        Some(block) => {
-                            log::warn!("rolling back block");
+            let block = self
+                .blockfetch
+                .as_mut()
+                .unwrap()
+                .fetch_single(point.clone())
+                .or_restart()?;
 
-                            let after_pop_len = self.blocks.rollback_queue_len();
-                            self.output
-                                .send(model::RawBlockPayload::roll_back(block.to_vec()))?;
+            self.output
+                .send(model::RawBlockPayload::roll_forward(block))?;
 
-                            self.block_count.inc(1);
+            self.block_count.inc(1);
 
-                            // Finalize if rollbacks are exhausted
-                            if after_pop_len == 0 {
-                                return Ok(gasket::runtime::WorkOutcome::Done);
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    log::warn!("big time error");
-                    return Err(gasket::error::Error::WorkPanic("rollback queue mismatch".to_string()));
-                }
+            // evaluate if we should finalize the thread according to config
+            if crosscut::should_finalize(&self.finalize, &point) {
+                return Ok(gasket::runtime::WorkOutcome::Done);
             }
-
-        } else {
-            log::warn!("working really");
-            // see if we have points that already reached certain depth
-            let ready = self.chain_buffer.pop_with_depth(self.min_depth);
-            log::warn!("popped chain");
-            log::debug!("found {} points with required min depth", ready.len());
-
-            // request download of blocks for confirmed points
-            for point in ready {
-                log::warn!("requesting block fetch for point {:?}", point);
-
-                let block = self
-                    .blockfetch
-                    .as_mut()
-                    .unwrap()
-                    .fetch_single(point.clone())
-                    .or_restart()?;
-
-                self.output
-                    .send(model::RawBlockPayload::roll_forward(block))?;
-
-                self.block_count.inc(1);
-
-                // evaluate if we should finalize the thread according to config
-                if crosscut::should_finalize(&self.finalize, &point) {
-                    return Ok(gasket::runtime::WorkOutcome::Done);
-                }
-            }
-
         }
 
         Ok(gasket::runtime::WorkOutcome::Partial)
