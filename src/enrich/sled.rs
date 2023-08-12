@@ -146,13 +146,33 @@ fn fetch_referenced_utxo<'a>(
 fn prune_tree(db: &sled::Db) {
     error!("pruning tree");
 
-    if let Ok(size) = db.size_on_disk() {
-        if size > 3000000 {
-            if let Ok(Some((first_key, _))) = db.first() {
-                db.remove(first_key).expect("todo: panic");
+    let mut keys_to_drop: Vec<sled::IVec> = vec![];
+    let mut drop_keys_batch = sled::Batch::default();
+
+    let mut count: u64 = 0;
+    while count < 200000 {
+        match db.iter().next() {
+            None => continue,
+            Some(next) => {
+                match next {
+                    Ok((key, _)) => {
+                        count += 1;
+                        if count > 100000 {
+                            keys_to_drop.push(key)
+                        }
+                    }
+                    Err(_) => continue
+                }
             }
         }
     }
+
+    for k in keys_to_drop {
+        drop_keys_batch.remove(k)
+    }
+
+    db.apply_batch(drop_keys_batch).expect("panic");
+
     error!("done pruning tree")
 }
 
@@ -384,12 +404,18 @@ impl gasket::runtime::Worker for Worker {
     }
 
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
-        log::error!("db opening");
         let db = sled::open(&self.config.db_path).or_retry()?;
-        let consumed_ring = sled::open(self.config.consumed_ring_path.clone().unwrap()).or_retry()?;
-        let produced_ring = sled::open(self.config.produced_ring_path.clone().unwrap()).or_retry()?;
-
         log::error!("db opened");
+
+        let consumed_ring = sled::open(self.config.consumed_ring_path.clone().unwrap()).or_retry()?;
+        log::error!("db opened");
+
+        let produced_ring = sled::open(self.config.produced_ring_path.clone().unwrap()).or_retry()?;
+        log::error!("db opened");
+
+
+
+        consumed_ring.pop_min();
 
         self.db = Some(db);
         self.consumed_ring = Some(consumed_ring);
