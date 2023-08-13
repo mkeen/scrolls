@@ -83,7 +83,6 @@ fn should_stop(pipeline: &bootstrap::Pipeline) -> bool {
 }
 
 fn shutdown(pipeline: bootstrap::Pipeline) {
-    print!("stopping!!");
     for tether in pipeline.tethers {
         let state = tether.check_state();
         log::warn!("dismissing stage: {} with state {:?}", tether.name(), state);
@@ -124,6 +123,7 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
     let pipeline = bootstrap::build(source, enrich, reducer, storage)?;
 
     log::info!("scrolls is running...");
+    println!("HELLO!!!!")
 
     while !should_stop(&pipeline) {
 
