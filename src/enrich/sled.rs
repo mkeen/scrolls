@@ -353,9 +353,9 @@ impl gasket::runtime::Worker for Worker {
     fn work(&mut self) -> gasket::runtime::WorkResult {
         let msg = self.input.recv_or_idle()?;
 
-        let db = self.db.as_ref().unwrap();
-        let produced_ring = self.produced_ring.as_ref().unwrap();
-        let consumed_ring = self.consumed_ring.as_ref().unwrap();
+        let db: &sled::Db = self.db.as_ref().unwrap();
+        let produced_ring: &sled::Db = self.produced_ring.as_ref().unwrap();
+        let consumed_ring: &sled::Db = self.consumed_ring.as_ref().unwrap();
 
         let mut ctx = BlockContext::default();
 
@@ -388,22 +388,22 @@ impl gasket::runtime::Worker for Worker {
                 self.blocks_counter.inc(1);
 
                 let handle_1 = tokio::spawn(async {
-                    prune_tree(&db);
-                    &db.flush()
+                    prune_tree(db);
+                    db.clone().flush()
                 });
 
                 let handle_2 = tokio::spawn(async {
                     prune_tree(&produced_ring);
-                    &produced_ring.flush()
+                    produced_ring.clone().flush()
                 });
 
                 let handle_3 = tokio::spawn(async {
                     prune_tree(consumed_ring);
-                    consumed_ring.flush()
+                    consumed_ring.clone().flush()
                 });
 
                 warn!("do sled cleanup");
-                block_on(async { futures::future::try_join_all(vec![handle_1, handle_2, handle_3]).await } ).or_panic()?;
+                block_on(async { futures::future::try_join3(handle_1, handle_2, handle_3).await } ).or_panic()?;
                 warn!("done sled cleanup");
             }
             model::RawBlockPayload::RollBack(cbor) => {
@@ -443,18 +443,10 @@ impl gasket::runtime::Worker for Worker {
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
         log::warn!("opening db1");
         let db = sled::open(&self.config.db_path).or_retry()?;
+        let consumed_ring = sled::open(self.config.consumed_ring_path.clone().unwrap_or_default()).or_retry()?;
+        let produced_ring = sled::open(self.config.produced_ring_path.clone().unwrap_or_default()).or_retry()?;
 
-        let consumed_ring = sled::open(self.config.consumed_ring_path.clone().unwrap()).or_retry()?;
-        let produced_ring = sled::open(self.config.produced_ring_path.clone().unwrap()).or_retry()?;
-
-        prune_tree(&db);
-        db.flush_async();
-
-        prune_tree(&consumed_ring);
-        db.flush_async();
-
-        prune_tree(&produced_ring);
-        db.flush_async();
+        match let (Ok())
 
         self.db = Some(db);
         self.consumed_ring = Some(consumed_ring);
