@@ -212,7 +212,6 @@ impl Worker {
         };
 
         self.inserts_counter.inc(txs.len() as u64);
-        prune_tree(produced_ring);
 
         batch_results
     }
@@ -303,8 +302,6 @@ impl Worker {
         };
 
         self.remove_counter.inc(keys.len() as u64);
-
-        prune_tree(consumed_ring);
 
         result
     }
@@ -411,12 +408,15 @@ impl gasket::runtime::Worker for Worker {
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
         log::warn!("opening db1");
         let db = sled::open(&self.config.db_path).or_retry()?;
+        prune_tree(&db);
         log::error!("db opened");
 
         let consumed_ring = sled::open(self.config.consumed_ring_path.clone().unwrap()).or_retry()?;
+        prune_tree(&consumed_ring);
         log::error!("db opened");
 
         let produced_ring = sled::open(self.config.produced_ring_path.clone().unwrap()).or_retry()?;
+        prune_tree(&consumed_ring);
         log::error!("db opened");
 
         self.db = Some(db);
