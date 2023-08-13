@@ -388,17 +388,20 @@ impl gasket::runtime::Worker for Worker {
                 self.blocks_counter.inc(1);
 
                 let handle_1 = tokio::spawn(async {
-                    prune_tree(db);
+                    let scope_db = db.clone();
+                    prune_tree(&scope_db.clone());
                     db.clone().flush()
                 });
 
                 let handle_2 = tokio::spawn(async {
-                    prune_tree(produced_ring);
-                    produced_ring.clone().flush()
+                    let scope_db = produced_ring.clone();
+                    prune_tree(&scope_db);
+                    scope_db.clone().flush()
                 });
 
                 let handle_3 = tokio::spawn(async {
-                    prune_tree(consumed_ring);
+                    let consumed_ring = consumed_ring.clone();
+                    prune_tree(&consumed_ring);
                     consumed_ring.clone().flush()
                 });
 
