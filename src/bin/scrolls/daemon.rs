@@ -102,6 +102,8 @@ fn shutdown(pipeline: bootstrap::Pipeline) {
 pub fn run(args: &Args) -> Result<(), scrolls::Error> {
     console::initialize(&args.console);
 
+
+
     let config = ConfigRoot::new(&args.config)
         .map_err(|err| scrolls::Error::ConfigError(format!("{:?}", err)))?;
 

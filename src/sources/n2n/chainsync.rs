@@ -106,8 +106,8 @@ impl Worker {
                     if block.len() > 0 {
                         log::warn!("Found block to roll back");
 
-                        self.output
-                            .send(model::RawBlockPayload::roll_back(block))?;
+                        // self.output
+                        //     .send(model::RawBlockPayload::roll_back(block))?;
                     }
                 }
 
