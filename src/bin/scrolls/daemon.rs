@@ -72,9 +72,10 @@ fn should_stop(pipeline: &bootstrap::Pipeline) -> bool {
     pipeline
         .tethers
         .iter()
-        .any(|tether| match tether.check_state() {
+        .all(|tether| match tether.check_state() {
             gasket::runtime::TetherState::Alive(x) => match x {
                 gasket::runtime::StageState::StandBy => true,
+                gasket::runtime::StageState::Idle => true,
                 _ => false,
             },
             _ => true,
