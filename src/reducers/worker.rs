@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use pallas::codec::minicbor::bytes::nil;
 use pallas::ledger::traverse::MultiEraBlock;
 
@@ -56,6 +56,8 @@ impl Worker {
 
         self.last_block.set(block.number() as i64);
 
+        warn!("block starting!");
+
         self.output.send(gasket::messaging::Message::from(
             model::CRDTCommand::block_starting(&block),
         ))?;
@@ -68,6 +70,8 @@ impl Worker {
         self.output.send(gasket::messaging::Message::from(
             model::CRDTCommand::block_finished(&block),
         ))?;
+
+        warn!("block finished!");
 
         Ok(())
     }
