@@ -391,8 +391,7 @@ impl gasket::runtime::Worker for Worker {
                 produced_ring.flush_async();
             }
             model::RawBlockPayload::RollBack(cbor) => {
-
-
+                log::warn!("ok this was probably reached wrongly");
                 let block = MultiEraBlock::decode(&cbor)
                     .map_err(crate::Error::cbor)
                     .apply_policy(&self.policy)
