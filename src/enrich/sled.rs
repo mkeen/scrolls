@@ -393,7 +393,7 @@ impl gasket::runtime::Worker for Worker {
                 });
 
                 let handle_2 = tokio::spawn(async {
-                    prune_tree(&produced_ring);
+                    prune_tree(produced_ring);
                     produced_ring.clone().flush()
                 });
 
@@ -445,8 +445,6 @@ impl gasket::runtime::Worker for Worker {
         let db = sled::open(&self.config.db_path).or_retry()?;
         let consumed_ring = sled::open(self.config.consumed_ring_path.clone().unwrap_or_default()).or_retry()?;
         let produced_ring = sled::open(self.config.produced_ring_path.clone().unwrap_or_default()).or_retry()?;
-
-        match let (Ok())
 
         self.db = Some(db);
         self.consumed_ring = Some(consumed_ring);
