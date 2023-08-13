@@ -100,17 +100,14 @@ impl Worker {
                 Ok(())
             }
             chainsync::RollbackEffect::OutOfScope => {
-                if let block_before_rollback = self.blocks.last_from(point.slot_or_default().to_string().as_bytes()) {
+                // todo instead return "None" and just be normal
+                let blocks = self.blocks.enqueue_rollback_batch(point);
+                for block in blocks {
+                    if block.len() > 0 {
+                        log::warn!("Found block to roll back");
 
-                    // todo instead return "None" and just be normal
-                    let blocks = self.blocks.enqueue_rollback_batch(point);
-                    for block in blocks {
-                        if block.len() > 0 {
-                            log::warn!("Found block to roll back");
-
-                            self.output
-                                .send(model::RawBlockPayload::roll_back(block))?;
-                        }
+                        self.output
+                            .send(model::RawBlockPayload::roll_back(block))?;
                     }
                 }
 

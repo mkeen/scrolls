@@ -86,13 +86,7 @@ impl RollbackData {
 
     pub fn enqueue_rollback_batch(&mut self, from: &Point) -> Vec<Vec<u8>> {
         let blocks = self.get_rollback_range(from);
-
-        let emt: Vec<u8> = Vec::default();
-
-        if !blocks.is_empty() || !blocks.first().unwrap_or(&emt).is_empty() {
-
-        }
-
+        
         blocks
     }
 

@@ -8,6 +8,7 @@ use serde_json::Value;
 use bech32::{ToBase32, Variant};
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
+use pallas::ledger::primitives::alonzo::PolicyId;
 
 use crate::{crosscut, model, prelude::*};
 
@@ -129,14 +130,14 @@ impl Reducer {
         fingerprint: &str,
         quantity: &str,
         should_exist: bool,
-    ) {
+    ) -> Result<(), gasket::error::Error> {
         match should_exist {
             true => {
                 output.send(model::CRDTCommand::set_add(
                     self.config.key_prefix.as_deref(),
                     tx_str,
                     format!("{}/{}/{}/{}", address, hex::encode(policy_id), fingerprint, quantity),
-                ).into());
+                ).into())
 
             }
 
@@ -145,7 +146,7 @@ impl Reducer {
                     self.config.key_prefix.as_deref(),
                     tx_str,
                     format!("{}/{}/{}/{}", address, hex::encode(policy_id), fingerprint, quantity),
-                ).into());
+                ).into())
 
             }
 
@@ -183,12 +184,13 @@ impl Reducer {
 
         // Spend Native Tokens
         for asset in utxo.non_ada_assets() {
-            if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
+            if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset.clone() {
+                let policy_id = hex::encode(PolicyId::from(*policy_id));
                 let asset_name = hex::encode(asset_name);
 
-                if let Ok(fingerprint) = asset_fingerprint([policy_id.clone().to_string().as_str(), asset_name.as_str()]) {
+                if let Ok(fingerprint) = asset_fingerprint([policy_id.as_str(), asset_name.as_str()]) {
                     if !fingerprint.is_empty() {
-                        self.token_state(output, address.as_str(), format!("{}#{}", input.hash(), input.index()).as_str(), policy_id.to_string().as_str(), fingerprint.to_string().as_str(), quantity.to_string().as_str(), rollback);
+                        self.token_state(output, address.as_str(), format!("{}#{}", input.hash(), input.index()).as_str(), policy_id.as_str(), fingerprint.to_string().as_str(), quantity.to_string().as_str(), rollback)?;
                     }
 
                 }
@@ -212,6 +214,8 @@ impl Reducer {
             let tx_hash = tx.hash();
             let tx_address = raw_address.to_bech32().unwrap_or(raw_address.to_string());
 
+            self.coin_state(output, tx_address.as_str(), &format!("{}#{}", tx_hash, output_idx), tx_output.lovelace_amount().to_string().as_str(), !rollback);
+
             if let Some(addresses) = &self.config.filter {
                 if let Err(_) = addresses.binary_search(&tx_address) {
                     return Ok(());
@@ -219,19 +223,14 @@ impl Reducer {
 
             }
 
-            let soa = self.stake_or_address_from_address(raw_address);
-            self.tx_state(output, soa.as_str(), &format!("{}#{}", tx_hash, output_idx), !rollback);
-
-            self.coin_state(output, tx_address.as_str(), &format!("{}#{}", tx_hash, output_idx), tx_output.lovelace_amount().to_string().as_str(), !rollback);
-
             for asset in tx_output.non_ada_assets() {
                 if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
                     let asset_name = hex::encode(asset_name);
-                    let policy_id_str = policy_id.clone().to_string();
+                    let policy_id_str = &hex::encode(PolicyId::from(*policy_id));
 
                     if let Ok(fingerprint) = asset_fingerprint([policy_id_str.as_str(), asset_name.as_str()]) {
                         if !fingerprint.is_empty() {
-                            self.token_state(output, tx_address.as_str(), format!("{}#{}", tx_hash, output_idx).as_str(), policy_id_str.as_str(), fingerprint.to_string().as_str(), quantity.to_string().as_str(), !rollback);
+                            self.token_state(output, tx_address.as_str(), format!("{}#{}", tx_hash, output_idx).as_str(), policy_id_str.as_str(), fingerprint.to_string().as_str(), quantity.to_string().as_str(), !rollback)?;
                         }
 
                     }
@@ -240,6 +239,8 @@ impl Reducer {
 
             }
 
+            let soa = self.stake_or_address_from_address(raw_address);
+            self.tx_state(output, soa.as_str(), &format!("{}#{}", tx_hash, output_idx), !rollback);
         }
 
         Ok(())
