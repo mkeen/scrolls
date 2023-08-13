@@ -172,12 +172,11 @@ fn prune_tree(db: &sled::Db) {
 
     if above_count >= 500000 {
         for k in keys_to_drop.clone() {
-            drop_keys_batch.remove(k)
+            db.remove(k);
         }
 
         log::warn!("dropping {} keys", keys_to_drop.len());
 
-        db.apply_batch(drop_keys_batch).expect("panic");
 
 
     }
