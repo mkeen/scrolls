@@ -1,4 +1,6 @@
 use std::time::Duration;
+use futures::executor::block_on;
+use futures::join;
 
 use gasket::{
     error::AsWorkError,
@@ -385,12 +387,24 @@ impl gasket::runtime::Worker for Worker {
 
                 self.blocks_counter.inc(1);
 
-                prune_tree(db);
-                prune_tree(produced_ring);
-                prune_tree(consumed_ring);
-                db.flush_async();
-                produced_ring.flush_async();
-                produced_ring.flush_async();
+                let handle_1 = tokio::spawn(async {
+                    prune_tree(db);
+                    db.flush()
+                });
+
+                let handle_2 = tokio::spawn(async {
+                    prune_tree(produced_ring);
+                    produced_ring.flush()
+                });
+
+                let handle_3 = tokio::spawn(async {
+                    prune_tree(consumed_ring);
+                    consumed_ring.flush()
+                });
+
+                warn!("do sled cleanup");
+                block_on(async { futures::future::try_join_all(vec![handle_1, handle_2, handle_3]).await } ).or_panic()?;
+                warn!("done sled cleanup");
             }
             model::RawBlockPayload::RollBack(cbor) => {
                 warn!("kewl rollong back");

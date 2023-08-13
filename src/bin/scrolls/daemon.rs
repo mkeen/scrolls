@@ -125,12 +125,11 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
     let pipeline = bootstrap::build(source, enrich, reducer, storage)?;
 
     log::info!("scrolls is running...");
-    println!("HELLO!!!!");
 
     while !should_stop(&pipeline) {
 
         console::refresh(&args.console, &pipeline);
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(Duration::from_millis(2000));
     }
 
     log::info!("Scrolls is stopping...");
