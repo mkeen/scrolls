@@ -182,6 +182,7 @@ fn prune_tree(db: &sled::Db) {
         error!("done pruning tree")
     }
 
+    db.flush(); // todo this might be slow
 }
 
 impl Worker {
