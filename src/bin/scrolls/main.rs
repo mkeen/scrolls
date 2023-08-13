@@ -22,7 +22,5 @@ fn main() {
         process::exit(1);
     }
 
-    log::warn!("maybe shouldnt be existing here");
-
     process::exit(0);
 }

@@ -104,17 +104,17 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
     let config = ConfigRoot::new(&args.config)
         .map_err(|err| scrolls::Error::ConfigError(format!("{:?}", err)))?;
 
-    let policy = config.policy.unwrap_or_default().into();
-    let block_config = config.blocks.unwrap_or_default();
-    let enrich = config.enrich.unwrap_or_default().bootstrapper(&policy, &block_config);
-    let blocks = block_config.clone().into();
-
     let chain = config.chain.unwrap_or_default().into();
+    let block_config = config.blocks.unwrap_or_default();
+    let blocks = block_config.clone().into();
+    let policy = config.policy.unwrap_or_default().into();
 
     let source = config
         .source
         .bootstrapper(&chain, &blocks, &config.intersect, &config.finalize, &policy);
-    
+
+    let enrich = config.enrich.unwrap_or_default().bootstrapper(&policy, &block_config);
+
     let reducer = reducers::Bootstrapper::new(config.reducers, &chain, &policy);
 
     let storage = config.storage.plugin(&chain, &config.intersect, &policy);
@@ -125,7 +125,7 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
 
     while !should_stop(&pipeline) {
         console::refresh(&args.console, &pipeline);
-        std::thread::sleep(Duration::from_millis(250));
+        std::thread::sleep(Duration::from_millis(5000));
     }
 
     log::info!("Scrolls is stopping...");
