@@ -151,14 +151,14 @@ fn prune_tree(db: &sled::Db) {
 
     let mut count: u64 = 0;
     let mut above_count: u64 = 0;
-    while count < 10000000 {
+    while count < 1000000 {
         match db.iter().next() {
             None => continue,
             Some(next) => {
                 match next {
                     Ok((key, _)) => {
                         count += 1;
-                        if count <= 5000000 {
+                        if count <= 500000 {
                             keys_to_drop.push(key)
                         } else {
                             above_count += 1;
@@ -170,7 +170,7 @@ fn prune_tree(db: &sled::Db) {
         }
     }
 
-    if above_count >= 5000000 {
+    if above_count >= 500000 {
         for k in keys_to_drop.clone() {
             drop_keys_batch.remove(k)
         }
