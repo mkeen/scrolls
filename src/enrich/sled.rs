@@ -179,10 +179,11 @@ fn prune_tree(db: &sled::Db) {
 
         db.apply_batch(drop_keys_batch).expect("panic");
 
-        error!("done pruning tree")
+
     }
 
     db.flush(); // todo this might be slow
+    error!("done pruning tree");
 }
 
 impl Worker {
