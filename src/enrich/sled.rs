@@ -409,6 +409,7 @@ impl gasket::runtime::Worker for Worker {
     }
 
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
+        log::warn!("opening db1");
         let db = sled::open(&self.config.db_path).or_retry()?;
         log::error!("db opened");
 
