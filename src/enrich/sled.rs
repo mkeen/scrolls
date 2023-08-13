@@ -384,6 +384,8 @@ impl gasket::runtime::Worker for Worker {
                 self.blocks_counter.inc(1);
             }
             model::RawBlockPayload::RollBack(cbor) => {
+
+
                 let block = MultiEraBlock::decode(&cbor)
                     .map_err(crate::Error::cbor)
                     .apply_policy(&self.policy)
@@ -399,6 +401,13 @@ impl gasket::runtime::Worker for Worker {
                 // Revert Anything to do with this block
                 self.remove_produced_utxos(db, produced_ring, &txs).expect("todo: panic error");
                 self.replace_consumed_utxos(db, consumed_ring, &txs).expect("todo: panic error");
+
+                prune_tree(db);
+                prune_tree(produced_ring);
+                prune_tree(consumed_ring);
+                db.flush_async();
+                produced_ring.flush_async();
+                produced_ring.flush_async();
 
                 let ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
 
