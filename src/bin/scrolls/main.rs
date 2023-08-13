@@ -13,9 +13,7 @@ enum Scrolls {
 }
 
 fn main() {
-    let args = Scrolls::parse();
-
-    let result = match args {
+    let result = match Scrolls::parse() {
         Scrolls::Daemon(x) => daemon::run(&x),
     };
 
@@ -23,6 +21,8 @@ fn main() {
         eprintln!("ERROR: {:#?}", err);
         process::exit(1);
     }
+
+    log::warn!("maybe shouldnt be existing here");
 
     process::exit(0);
 }
