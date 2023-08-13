@@ -4,7 +4,7 @@ use gasket::{
     error::AsWorkError,
     runtime::{spawn_stage, WorkOutcome},
 };
-use log::error;
+use log::{error, warn};
 
 use pallas::{
     codec::minicbor,
@@ -393,6 +393,8 @@ impl gasket::runtime::Worker for Worker {
                 produced_ring.flush_async();
             }
             model::RawBlockPayload::RollBack(cbor) => {
+                warn!("kewl rollong back");
+
                 if !cbor.is_empty() {
                     let block = MultiEraBlock::decode(&cbor)
                         .map_err(crate::Error::cbor)
@@ -410,18 +412,13 @@ impl gasket::runtime::Worker for Worker {
                     self.remove_produced_utxos(db, produced_ring, &txs).expect("todo: panic error");
                     self.replace_consumed_utxos(db, consumed_ring, &txs).expect("todo: panic error");
 
-                    prune_tree(db);
-                    prune_tree(produced_ring);
-                    prune_tree(consumed_ring);
-                    db.flush_async();
-                    produced_ring.flush_async();
-                    produced_ring.flush_async();
-
                     ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
                 }
 
                 self.output
                     .send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
+
+                self.blocks_counter.inc(1);
             }
         };
 
