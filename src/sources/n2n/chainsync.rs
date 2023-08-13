@@ -116,7 +116,6 @@ impl Worker {
                 }
 
                 if !sent_block {
-                    log::warn!("skipped sending rollback block 2");
                     let empty: Vec<u8> = vec![];
                     self.output
                         .send(model::RawBlockPayload::roll_back(empty))?;

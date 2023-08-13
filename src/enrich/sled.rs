@@ -355,6 +355,8 @@ impl gasket::runtime::Worker for Worker {
         let produced_ring = self.produced_ring.as_ref().unwrap();
         let consumed_ring = self.consumed_ring.as_ref().unwrap();
 
+        let mut ctx = BlockContext::default();
+
         match msg.payload {
             model::RawBlockPayload::RollForward(cbor) => {
                 let block = MultiEraBlock::decode(&cbor)
@@ -391,31 +393,32 @@ impl gasket::runtime::Worker for Worker {
                 produced_ring.flush_async();
             }
             model::RawBlockPayload::RollBack(cbor) => {
-                log::warn!("ok this was probably reached wrongly");
-                let block = MultiEraBlock::decode(&cbor)
-                    .map_err(crate::Error::cbor)
-                    .apply_policy(&self.policy)
-                    .or_panic()?;
+                if !cbor.is_empty() {
+                    let block = MultiEraBlock::decode(&cbor)
+                        .map_err(crate::Error::cbor)
+                        .apply_policy(&self.policy)
+                        .or_panic()?;
 
-                let block = match block {
-                    Some(x) => x,
-                    None => return Ok(gasket::runtime::WorkOutcome::Partial),
-                };
+                    let block = match block {
+                        Some(x) => x,
+                        None => return Ok(gasket::runtime::WorkOutcome::Partial),
+                    };
 
-                let txs = block.txs();
+                    let txs = block.txs();
 
-                // Revert Anything to do with this block
-                self.remove_produced_utxos(db, produced_ring, &txs).expect("todo: panic error");
-                self.replace_consumed_utxos(db, consumed_ring, &txs).expect("todo: panic error");
+                    // Revert Anything to do with this block
+                    self.remove_produced_utxos(db, produced_ring, &txs).expect("todo: panic error");
+                    self.replace_consumed_utxos(db, consumed_ring, &txs).expect("todo: panic error");
 
-                prune_tree(db);
-                prune_tree(produced_ring);
-                prune_tree(consumed_ring);
-                db.flush_async();
-                produced_ring.flush_async();
-                produced_ring.flush_async();
+                    prune_tree(db);
+                    prune_tree(produced_ring);
+                    prune_tree(consumed_ring);
+                    db.flush_async();
+                    produced_ring.flush_async();
+                    produced_ring.flush_async();
 
-                let ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
+                    ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
+                }
 
                 self.output
                     .send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
