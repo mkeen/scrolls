@@ -382,6 +382,13 @@ impl gasket::runtime::Worker for Worker {
                     .send(model::EnrichedBlockPayload::roll_forward(cbor, ctx))?;
 
                 self.blocks_counter.inc(1);
+
+                prune_tree(db);
+                prune_tree(produced_ring);
+                prune_tree(consumed_ring);
+                db.flush_async();
+                produced_ring.flush_async();
+                produced_ring.flush_async();
             }
             model::RawBlockPayload::RollBack(cbor) => {
 
