@@ -181,7 +181,6 @@ fn prune_tree(db: &sled::Db) {
 
     }
 
-    db.flush(); // todo this might be slow
     error!("done pruning tree");
 }
 
