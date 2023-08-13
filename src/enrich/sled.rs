@@ -419,13 +419,13 @@ impl gasket::runtime::Worker for Worker {
         let produced_ring = sled::open(self.config.produced_ring_path.clone().unwrap()).or_retry()?;
 
         prune_tree(&db);
-        db.flush();
+        db.flush_async();
 
         prune_tree(&consumed_ring);
-        db.flush();
+        db.flush_async();
 
         prune_tree(&produced_ring);
-        db.flush();
+        db.flush_async();
 
         self.db = Some(db);
         self.consumed_ring = Some(consumed_ring);

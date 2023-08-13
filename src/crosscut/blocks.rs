@@ -86,7 +86,7 @@ impl RollbackData {
 
     pub fn enqueue_rollback_batch(&mut self, from: &Point) -> Vec<Vec<u8>> {
         let blocks = self.get_rollback_range(from);
-        
+
         blocks
     }
 
