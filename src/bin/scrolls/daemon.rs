@@ -99,7 +99,6 @@ fn shutdown(pipeline: bootstrap::Pipeline) {
 }
 
 pub fn run(args: &Args) -> Result<(), scrolls::Error> {
-    log::error!("LOGGGGGGGGGGING RUN");
     console::initialize(&args.console);
 
     let config = ConfigRoot::new(&args.config)
@@ -126,7 +125,7 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
 
     while !should_stop(&pipeline) {
         console::refresh(&args.console, &pipeline);
-        std::thread::sleep(Duration::from_millis(1500));
+        std::thread::sleep(Duration::from_millis(250));
     }
 
     log::info!("Scrolls is stopping...");
