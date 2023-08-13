@@ -3,6 +3,7 @@ use pallas::network::miniprotocols::chainsync::HeaderContent;
 use pallas::network::miniprotocols::{blockfetch, chainsync, Point};
 
 use gasket::error::AsWorkError;
+use log::log;
 use pallas::network::multiplexer::StdChannel;
 use sled::IVec;
 
@@ -102,13 +103,23 @@ impl Worker {
             chainsync::RollbackEffect::OutOfScope => {
                 // todo instead return "None" and just be normal
                 let blocks = self.blocks.enqueue_rollback_batch(point);
+                let mut sent_block = false;
                 for block in blocks {
                     if block.len() > 0 {
                         log::warn!("Found block to roll back");
 
-                        // self.output
-                        //     .send(model::RawBlockPayload::roll_back(block))?;
+                        self.output
+                            .send(model::RawBlockPayload::roll_back(block))?;
+
+                        sent_block = true;
                     }
+                }
+
+                if !sent_block {
+                    log::warn!("skipped sending rollback block 2");
+                    let empty: Vec<u8> = vec![];
+                    self.output
+                        .send(model::RawBlockPayload::roll_back(empty))?;
                 }
 
                 Ok(())
