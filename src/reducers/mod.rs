@@ -87,6 +87,8 @@ pub enum Config {
     AssetMetadata(asset_metadata::Config),
     #[cfg(feature = "unstable")]
     PolicyAssetsMoved(policy_assets_moved::Config),
+    #[cfg(feature = "unstable")]
+    MultiAssetBalances(multi_asset_balances::Config),
 }
 
 impl Config {
@@ -131,6 +133,8 @@ impl Config {
             Config::AssetMetadata(c) => c.plugin(chain, policy),
             #[cfg(feature = "unstable")]
             Config::PolicyAssetsMoved(c) => c.plugin(chain, policy),
+            #[cfg(feature = "unstable")]
+            Config::MultiAssetBalances(c) => c.plugin(chain, policy),
         }
     }
 }
