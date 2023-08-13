@@ -423,6 +423,8 @@ impl gasket::runtime::Worker for Worker {
         self.consumed_ring = Some(consumed_ring);
         self.produced_ring = Some(produced_ring);
 
+        log::warn!("alldb opened");
+
         Ok(())
     }
 
