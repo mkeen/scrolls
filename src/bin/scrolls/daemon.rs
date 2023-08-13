@@ -123,7 +123,7 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
     let pipeline = bootstrap::build(source, enrich, reducer, storage)?;
 
     log::info!("scrolls is running...");
-    println!("HELLO!!!!")
+    println!("HELLO!!!!");
 
     while !should_stop(&pipeline) {
 
