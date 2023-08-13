@@ -153,7 +153,10 @@ fn prune_tree(db: &sled::Db) {
     let mut above_count: u64 = 0;
     while count < 1000000 {
         match db.iter().next() {
-            None => continue,
+            None => {
+                count = 1000000;
+                continue
+            },
             Some(next) => {
                 match next {
                     Ok((key, _)) => {
@@ -164,7 +167,10 @@ fn prune_tree(db: &sled::Db) {
                             above_count += 1;
                         }
                     }
-                    Err(_) => continue
+                    Err(_) => {
+                        count = 1000000;
+                        continue
+                    }
                 }
             }
         }
