@@ -167,11 +167,10 @@ fn prune_tree(db: &sled::Db) {
                             None => break,
                             Some((new_last_seen_v, _)) => {
                                 last_seen_key = new_last_seen_v.clone();
-                                if skipped > 200000 { // Keep 200,000 records in the circular buffers
+                                if skipped > 1000000 { // Keep 1,000,0 records in the circular buffers
                                     count += 1;
                                     trim_batch.remove(new_last_seen_v)
                                 }
-
                                 skipped += 1;
                             }
                         }
@@ -181,6 +180,8 @@ fn prune_tree(db: &sled::Db) {
 
                 if count > 0 {
                     log::error!("trimming {}", count);
+                } else {
+                    log::error!("no trim needed -- current length {}", db.len());
                 }
 
                 db.apply_batch(trim_batch).expect("panic");
