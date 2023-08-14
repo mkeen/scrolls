@@ -517,6 +517,7 @@ impl gasket::runtime::Worker for Worker {
     }
 
     fn teardown(&mut self) -> Result<(), gasket::error::Error> {
+        error!("SHUT ME DOWN CHARLIE");
         Ok(())
     }
 }
