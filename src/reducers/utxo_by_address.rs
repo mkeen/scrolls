@@ -227,7 +227,7 @@ impl Reducer {
             for asset in tx_output.non_ada_assets() {
                 if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
                     let asset_name = hex::encode(asset_name);
-                    let policy_id_str = hex::encode(policy_id);
+                    let policy_id_str = hex::encode(PolicyId::from(*policy_id));
 
                     if let Ok(fingerprint) = asset_fingerprint([policy_id_str.as_str(), asset_name.as_str()]) {
                         if !fingerprint.is_empty() {
