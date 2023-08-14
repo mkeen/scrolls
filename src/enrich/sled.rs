@@ -163,6 +163,8 @@ fn prune_tree(db: &sled::Db) {
 
     let mut count: u64 = 0;
 
+    log::error!("going to look into trimming");
+
     match db.last() {
         Ok(last_result) => match last_result {
             None => {}
@@ -190,7 +192,7 @@ fn prune_tree(db: &sled::Db) {
                     }
                 }
 
-                log::debug!("trimming {}", count);
+                log::error!("trimming {}", count);
 
                 db.apply_batch(trim_batch).expect("panic");
             }
