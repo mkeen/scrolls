@@ -203,7 +203,7 @@ impl Worker {
                                 Some(())
                             },
                             Some(last_pruned) => {
-                                if last_pruned.elapsed() > Duration::from_secs(60) {
+                                if last_pruned.elapsed() > Duration::from_secs(10) {
                                     prune_tree(produced_ring);
                                     prune_tree(consumed_ring);
                                     self.last_db_prune_time = Some(std::time::Instant::now());
