@@ -1,13 +1,5 @@
-use std::cell::RefCell;
-use std::future::IntoFuture;
-use std::process::Output;
-use std::rc::Rc;
-use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
-use futures::executor::block_on;
 use futures::{join, TryFutureExt};
-use futures::future::err;
 
 use gasket::{
     error::AsWorkError,
@@ -23,6 +15,7 @@ use pallas::{
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 use sled::{Db, IVec};
+use tokio::time::Instant;
 
 use crate::{
     bootstrap, crosscut,
@@ -77,8 +70,7 @@ impl Bootstrapper {
             db: None,
             consumed_ring: None,
             produced_ring: None,
-            flushing: false,
-            should_flush: false,
+            last_db_clean_time: std::time::Instant::now(),
             input: self.input,
             output: self.output,
             inserts_counter: Default::default(),
@@ -105,8 +97,7 @@ pub struct Worker {
     db: Option<sled::Db>,
     consumed_ring: Option<sled::Db>,
     produced_ring: Option<sled::Db>,
-    flushing: bool,
-    should_flush: bool,
+    last_db_clean_time: std::time::Instant,
     input: InputPort,
     output: OutputPort,
     inserts_counter: gasket::metrics::Counter,
@@ -206,8 +197,11 @@ impl Worker {
             Ok(inner) => {
                 match inner {
                     Some((_, produced_ring, consumed_ring)) => {
-                        prune_tree(produced_ring);
-                        prune_tree(consumed_ring);
+                        if self.last_db_clean_time.elapsed() > Duration::from_secs(240) {
+                            prune_tree(produced_ring);
+                            prune_tree(consumed_ring);
+                        }
+
                         Ok(())
                     }
                     _ => Err(())
