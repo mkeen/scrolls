@@ -70,7 +70,7 @@ impl Worker {
             model::CRDTCommand::block_finished(&block),
         ))?;
 
-        warn!("block finished!");
+        warn!("block finished! {}", block.slot());
 
         Ok(())
     }
