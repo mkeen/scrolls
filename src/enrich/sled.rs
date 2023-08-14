@@ -178,7 +178,7 @@ fn prune_tree(db: &sled::Db) {
                             None => {break}
                             Some((new_last_seen_v, _)) => {
                                 last_seen_key = new_last_seen_v.clone();
-                                if skipped > 100000 {
+                                if skipped > 10 {
                                     count += 1;
                                     log::error!("databvase got too big {}", new_last_seen_v.len());
 
