@@ -178,10 +178,8 @@ fn prune_tree(db: &sled::Db) {
                             None => {break}
                             Some((new_last_seen_v, _)) => {
                                 last_seen_key = new_last_seen_v.clone();
-                                if skipped > 10 {
+                                if skipped > 100 {
                                     count += 1;
-                                    log::error!("databvase got too big {}", new_last_seen_v.len());
-
                                     trim_batch.remove(new_last_seen_v)
                                 }
 
@@ -192,7 +190,9 @@ fn prune_tree(db: &sled::Db) {
                     }
                 }
 
-                log::error!("trimming {}", count);
+                if count > 0 {
+                    log::error!("trimming {}", count);
+                }
 
                 db.apply_batch(trim_batch).expect("panic");
             }
