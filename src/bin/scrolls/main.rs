@@ -29,14 +29,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             tokio::select! {
                 _ = signal::ctrl_c() => {
-                    token.cancel();
+                    token_daemon.cancel();
                 },
             }
         }
     });
 
     match Scrolls::parse() {
-        Scrolls::Daemon(x) => daemon::run(&x, token_daemon),
+        Scrolls::Daemon(x) => daemon::run(&x, token),
     };
 
 
