@@ -55,8 +55,6 @@ impl Worker {
 
         self.last_block.set(block.number() as i64);
 
-        warn!("block starting!");
-
         self.output.send(gasket::messaging::Message::from(
             model::CRDTCommand::block_starting(&block),
         ))?;
@@ -69,9 +67,7 @@ impl Worker {
         self.output.send(gasket::messaging::Message::from(
             model::CRDTCommand::block_finished(&block),
         ))?;
-
-        warn!("block finished! {}", block.slot());
-
+        
         Ok(())
     }
 
