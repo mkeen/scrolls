@@ -8,6 +8,7 @@ use serde_json::Value;
 use bech32::{ToBase32, Variant};
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
+use elasticsearch::http::request::Body;
 use pallas::ledger::primitives::alonzo::PolicyId;
 
 use crate::{crosscut, model, prelude::*};
@@ -185,7 +186,7 @@ impl Reducer {
         // Spend Native Tokens
         for asset in utxo.non_ada_assets() {
             if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset.clone() {
-                let policy_id = hex::encode(PolicyId::from(*policy_id).to_ascii_lowercase());
+                let policy_id: String = hex::encode(policy_id);
                 let asset_name = hex::encode(asset_name);
 
                 if let Ok(fingerprint) = asset_fingerprint([policy_id.as_str(), asset_name.as_str()]) {
@@ -226,7 +227,7 @@ impl Reducer {
             for asset in tx_output.non_ada_assets() {
                 if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset {
                     let asset_name = hex::encode(asset_name);
-                    let policy_id_str = &hex::encode(PolicyId::from(*policy_id));
+                    let policy_id_str = hex::encode(policy_id);
 
                     if let Ok(fingerprint) = asset_fingerprint([policy_id_str.as_str(), asset_name.as_str()]) {
                         if !fingerprint.is_empty() {
