@@ -474,7 +474,7 @@ impl gasket::runtime::Worker for Worker {
 
         self.db = Some(db);
         self.consumed_ring = Some(consumed_ring);
-        
+
         Ok(())
     }
 
