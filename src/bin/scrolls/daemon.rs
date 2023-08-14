@@ -89,17 +89,17 @@ fn should_stop(pipeline: &bootstrap::Pipeline) -> bool {
         })
 }
 
-fn safe_shutdown(pipeline: &bootstrap::Pipeline) {
-    for tether in &pipeline.tethers {
-        error!("!!!! {}", tether.name());
-    }
-}
-
 fn shutdown(pipeline: bootstrap::Pipeline) {
     for tether in pipeline.tethers {
-        let state = tether.check_state();
-        log::warn!("dismissing stage: {} with state {:?}", tether.name(), state);
-        tether.dismiss_stage().expect("stage stops");
+        for tether in pipeline.tethers {
+            if tether.name() == "n2n" {
+                tether.join_stage();
+            }
+        }
+
+        // let state = tether.check_state();
+        // log::warn!("dismissing stage: {} with state {:?}", tether.name(), state);
+        // tether.dismiss_stage().expect("stage stops");
 
         // Can't join the stage because there's a risk of deadlock, usually
         // because a stage gets stuck sending into a port which depends on a
@@ -157,8 +157,8 @@ pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::E
         console::refresh(&args.console, &pipeline);
 
         if !started_cancel && block_on(process_shutting_down(proc_cancel.clone())) {
-            //started_cancel = true
-            safe_shutdown(&pipeline);
+            started_cancel = true
+            shutdown(&pipeline);
         }
 
         std::thread::sleep(Duration::from_millis(5000));
