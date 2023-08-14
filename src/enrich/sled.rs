@@ -170,7 +170,6 @@ fn prune_tree(db: &sled::Db) {
                 let mut skipped = 0;
                 let mut last_seen_key = last_key.clone();
                 let mut trim_batch = sled::Batch::default();
-
                 loop {
                     match db.get_lt(last_seen_key) {
                         Ok(new_last_seen) => match new_last_seen {
@@ -206,6 +205,7 @@ impl Worker {
             Ok(inner) => {
                 match inner {
                     Some((db, produced_ring, consumed_ring)) => {
+                        warn!("should clean up");
                         db.flush().or_retry().expect("panic");
                         prune_tree(produced_ring);
                         produced_ring.flush().or_retry().expect("panic");
