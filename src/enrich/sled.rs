@@ -14,7 +14,7 @@ use gasket::{
     runtime::{spawn_stage, WorkOutcome},
 };
 use gasket::error::Error;
-use log::{error, warn};
+use log::{error, log, warn};
 
 use pallas::{
     codec::minicbor,
@@ -274,6 +274,8 @@ impl Worker {
                 let body = output.encode();
                 let value: IVec = SledTxValue(era, body).try_into()?;
 
+                log::warn!("annotating tx in");
+
                 rollback_insert_batch.insert(key.as_bytes(), IVec::default());
                 insert_batch.insert(key.as_bytes(), value)
             }
@@ -284,6 +286,8 @@ impl Worker {
             (Ok(()), Ok(())) => Ok(()),
             _ => Err(crate::Error::storage("failed to apply batches".to_string())),
         };
+
+        log::warn!("wtd");
 
         self.inserts_counter.inc(txs.len() as u64);
 
