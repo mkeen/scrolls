@@ -119,7 +119,7 @@ pub async fn forced_shutdown() -> bool {
     process_shutdown
 }
 
-pub fn run(args: &Args) -> Result<(), scrolls::Error> {
+pub async fn run(args: &Args) -> Result<(), scrolls::Error> {
 
     console::initialize(&args.console);
 

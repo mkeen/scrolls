@@ -1,5 +1,6 @@
 use clap::Parser;
 use std::process;
+use futures::executor::block_on;
 
 mod console;
 mod daemon;
@@ -16,7 +17,7 @@ fn main() {
     let args = Scrolls::parse();
 
     let result = match args {
-        Scrolls::Daemon(x) => daemon::run(&x),
+        Scrolls::Daemon(x) => block_on(daemon::run(&x)),
     };
 
     if let Err(err) = &result {
