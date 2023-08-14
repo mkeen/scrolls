@@ -1,9 +1,6 @@
 use clap::Parser;
 use std::process;
 
-use tokio::sync::mpsc;
-use tokio_util::sync::CancellationToken;
-
 mod console;
 mod daemon;
 
@@ -15,34 +12,17 @@ enum Scrolls {
     Daemon(daemon::Args),
 }
 
-fn random() {
-    println!("hi there")
-}
+fn main() {
+    let args = Scrolls::parse();
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let token = CancellationToken::new();
-    let token_daemon = token.clone();
-
-    tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                _ = tokio::signal::ctrl_c() => {
-                    token.cancel();
-                },
-            }
-        }
-    });
-
-    let m = match Scrolls::parse() {
-        Scrolls::Daemon(x) => daemon::run(&x, token_daemon),
+    let result = match args {
+        Scrolls::Daemon(x) => daemon::run(&x),
     };
 
-    // if let Err(err) = &result {
-    //     eprintln!("ERROR: {:#?}", err);
-    //     process::exit(1);
-    // }
+    if let Err(err) = &result {
+        eprintln!("ERROR: {:#?}", err);
+        process::exit(1);
+    }
 
-    Ok(())
+    process::exit(0);
 }
-
