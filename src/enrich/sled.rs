@@ -216,10 +216,16 @@ impl Worker {
                         }
 
                     }
-                    _ => None
+                    _ => {
+                        self.last_db_prune_time = Some(std::time::Instant::now());
+                        Some(())
+                    }
                 }
             },
-            Err(_) => None
+            Err(_) => {
+                self.last_db_prune_time = Some(std::time::Instant::now());
+                Some(())
+            }
         }
     }
 
