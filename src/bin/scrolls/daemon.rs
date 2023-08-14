@@ -2,6 +2,7 @@ use clap;
 use scrolls::{bootstrap, crosscut, enrich, reducers, sources, storage};
 use serde::Deserialize;
 use std::time::Duration;
+use futures::executor::block_on;
 use tokio::signal;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
@@ -102,8 +103,20 @@ fn shutdown(pipeline: bootstrap::Pipeline) {
     }
 }
 
-pub async fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::Error> {
+#[inline]
+pub async fn process_shutting_down(proc_cancel: CancellationToken) -> bool {
     let mut process_cancelled = false;
+
+    tokio::select! {
+        _ = proc_cancel.cancelled() => {
+            process_cancelled = true;
+        }
+    }
+
+    process_cancelled
+}
+
+pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::Error> {
 
     console::initialize(&args.console);
 
@@ -129,17 +142,13 @@ pub async fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scro
 
     log::info!("scrolls is running...");
 
-    while !should_stop(&pipeline) {
-        tokio::select! {
-            _ = proc_cancel.cancelled() => {
-                process_cancelled = true;
-            }
-        }
+    let mut started_cancel = false;
 
+    while !should_stop(&pipeline) {
         console::refresh(&args.console, &pipeline);
 
-        if process_cancelled {
-            log::error!("process killed")
+        if !started_cancel && block_on(process_shutting_down(proc_cancel.clone())) {
+            started_cancel = true
         }
 
         std::thread::sleep(Duration::from_millis(500));

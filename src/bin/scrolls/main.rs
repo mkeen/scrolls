@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let m = match Scrolls::parse() {
-        Scrolls::Daemon(x) => daemon::run(&x, token_daemon).await,
+        Scrolls::Daemon(x) => daemon::run(&x, token_daemon),
     };
 
     // if let Err(err) = &result {
