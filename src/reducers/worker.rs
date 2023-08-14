@@ -67,7 +67,7 @@ impl Worker {
         self.output.send(gasket::messaging::Message::from(
             model::CRDTCommand::block_finished(&block),
         ))?;
-        
+
         Ok(())
     }
 
