@@ -104,16 +104,6 @@ fn shutdown(pipeline: bootstrap::Pipeline) {
 
 pub async fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::Error> {
     let mut process_cancelled = false;
-    tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                // Step 3: Using cloned token to listen to cancellation requests
-                _ = proc_cancel.cancelled() => {
-                    process_cancelled = true;
-                }
-            }
-        }
-    });
 
     console::initialize(&args.console);
 
@@ -140,6 +130,13 @@ pub async fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scro
     log::info!("scrolls is running...");
 
     while !should_stop(&pipeline) {
+        tokio::select! {
+            _ = proc_cancel.cancelled() => {
+                println!("WEfwe");
+                process_cancelled = true;
+            }
+        }
+
         console::refresh(&args.console, &pipeline);
 
         if process_cancelled {
