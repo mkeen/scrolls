@@ -129,10 +129,9 @@ pub async fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scro
 
     log::info!("scrolls is running...");
 
-    while !should_stop(&pipeline) {
+    while !should_stop(&pipeline) && !process_cancelled {
         tokio::select! {
             _ = proc_cancel.cancelled() => {
-                println!("efwefwefwefwefwefwef");
                 process_cancelled = true;
             }
         }
@@ -146,12 +145,11 @@ pub async fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scro
         std::thread::sleep(Duration::from_millis(500));
     }
 
-    log::info!("Scrolls is stopping...");
+    log::error!("Scrolls is stopping...");
 
     shutdown(pipeline);
     blocks.close();
 
-    println!("GOODBYE!!!!");
     log::error!("Scrolls has exited normally...");
 
     Ok(())
