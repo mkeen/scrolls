@@ -21,19 +21,21 @@ async fn random() {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let result = match Scrolls::parse() {
-        Scrolls::Daemon(x) => daemon::run(&x),
-    };
-
     tokio::spawn(async move {
         loop {
             tokio::select! {
                 _ = signal::ctrl_c() => {
-                    random();
+                    let _ = random();
                 },
             }
         }
     });
+
+    let result = match Scrolls::parse() {
+        Scrolls::Daemon(x) => daemon::run(&x),
+    };
+
+
 
 
 
