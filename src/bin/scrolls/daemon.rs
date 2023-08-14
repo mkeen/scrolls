@@ -91,15 +91,9 @@ fn should_stop(pipeline: &bootstrap::Pipeline) -> bool {
 
 fn shutdown(pipeline: bootstrap::Pipeline) {
     for tether in pipeline.tethers {
-        for tether in pipeline.tethers {
-            if tether.name() == "n2n" {
-                tether.join_stage();
-            }
-        }
-
-        // let state = tether.check_state();
-        // log::warn!("dismissing stage: {} with state {:?}", tether.name(), state);
-        // tether.dismiss_stage().expect("stage stops");
+        let state = tether.check_state();
+        log::warn!("dismissing stage: {} with state {:?}", tether.name(), state);
+        tether.dismiss_stage().expect("stage stops");
 
         // Can't join the stage because there's a risk of deadlock, usually
         // because a stage gets stuck sending into a port which depends on a
