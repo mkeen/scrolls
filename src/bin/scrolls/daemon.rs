@@ -129,7 +129,7 @@ pub async fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scro
 
     log::info!("scrolls is running...");
 
-    while !should_stop(&pipeline) && !process_cancelled {
+    while !should_stop(&pipeline) {
         tokio::select! {
             _ = proc_cancel.cancelled() => {
                 process_cancelled = true;
