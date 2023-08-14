@@ -22,5 +22,7 @@ fn main() {
         process::exit(1);
     }
 
+    println!("goodbye");
+
     process::exit(0);
 }

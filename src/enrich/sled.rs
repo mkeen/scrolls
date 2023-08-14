@@ -158,8 +158,6 @@ fn fetch_referenced_utxo<'a>(
 
 #[inline]
 fn prune_tree(db: &sled::Db) {
-    error!("pruning tree");
-
     let mut keys_to_drop: Vec<sled::IVec> = vec![];
     let mut drop_keys_batch = sled::Batch::default();
 
@@ -201,7 +199,6 @@ fn prune_tree(db: &sled::Db) {
 
     }
 
-    error!("done pruning tree");
 }
 
 impl Worker {
