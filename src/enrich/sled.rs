@@ -444,7 +444,7 @@ impl gasket::runtime::Worker for Worker {
                     // and finally we remove utxos consumed by the block
                     self.remove_consumed_utxos(db, consumed_ring, &txs).or_restart()?;
 
-                    self.clean_dbs().expect("todo panic");
+                    self.clean_dbs();
 
                     self.output
                         .send(model::EnrichedBlockPayload::roll_forward(cbor, ctx))?;
@@ -473,7 +473,7 @@ impl gasket::runtime::Worker for Worker {
 
                                 ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
 
-                                self.clean_dbs().expect("todo panic");
+                                self.clean_dbs();
                             }
                             Err(_) => {
                                 log::warn!("THIS SHOULD NEBVER SHOW UP ANYWHERE")
