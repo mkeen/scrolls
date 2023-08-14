@@ -198,9 +198,12 @@ impl Worker {
                 match inner {
                     Some((_, produced_ring, consumed_ring)) => {
                         match self.last_db_prune_time {
-                            None => Some(()),
+                            None => {
+                                self.last_db_prune_time = Some(std::time::Instant::now());
+                                Some(())
+                            },
                             Some(last_pruned) => {
-                                if last_pruned.elapsed() > Duration::from_secs(248) {
+                                if last_pruned.elapsed() > Duration::from_secs(10) {
                                     error!("pruning the thing");
                                     prune_tree(produced_ring);
                                     prune_tree(consumed_ring);
