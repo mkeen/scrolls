@@ -144,7 +144,7 @@ pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::E
 
     let mut started_cancel = false;
 
-    while !should_stop(&pipeline) {
+    while !should_stop(&pipeline) && !started_cancel {
         console::refresh(&args.console, &pipeline);
 
         if !started_cancel && block_on(process_shutting_down(proc_cancel.clone())) {
