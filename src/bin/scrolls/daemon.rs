@@ -8,7 +8,6 @@ use futures::future::err;
 use log::error;
 use tokio::signal;
 use tokio::sync::mpsc::UnboundedReceiver;
-use tokio::task::spawn_blocking;
 use tokio_util::sync::CancellationToken;
 
 use crate::console;
@@ -92,6 +91,12 @@ fn should_stop(pipeline: &bootstrap::Pipeline) -> bool {
 
 fn shutdown(pipeline: bootstrap::Pipeline) {
     for tether in pipeline.tethers {
+        // for tether in pipeline.tethers {
+        //     if tether.name() == "n2n" {
+        //         tether.join_stage();
+        //     }
+        // }
+
         let state = tether.check_state();
         log::warn!("dismissing stage: {} with state {:?}", tether.name(), state);
         tether.dismiss_stage().expect("stage stops");
@@ -121,6 +126,9 @@ pub async fn process_shutting_down(proc_cancel: CancellationToken) -> bool {
 }
 
 pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::Error> {
+
+    console::initialize(&args.console);
+
     let config = ConfigRoot::new(&args.config)
         .map_err(|err| scrolls::Error::ConfigError(format!("{:?}", err)))?;
 
@@ -145,17 +153,11 @@ pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::E
 
     let mut started_cancel = false;
 
-    while !should_stop(&pipeline) && !started_cancel {
-        let output = spawn_blocking(|| {
-            console::initialize(&args.console);
-            console::refresh(&args.console, &pipeline);
-        });
-
-        // Do other things while the blocking task is running.
-        let result = block_on(output);
+    while !should_stop(&pipeline) {
+        console::refresh(&args.console, &pipeline);
 
         if !started_cancel && block_on(process_shutting_down(proc_cancel.clone())) {
-            started_cancel = true;
+            started_cancel = true
         }
 
         std::thread::sleep(Duration::from_millis(5000));
