@@ -205,8 +205,9 @@ impl Worker {
                             },
                             Some(last_pruned) => {
                                 if last_pruned.elapsed() > Duration::from_secs(120) {
-                                    prune_tree(produced_ring);
-                                    prune_tree(consumed_ring);
+                                    //prune_tree(produced_ring);
+                                    //prune_tree(consumed_ring);
+                                    // todo one day we will prune again
                                     self.last_db_prune_time = Some(std::time::Instant::now());
                                     Some(())
                                 } else {
