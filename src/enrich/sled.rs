@@ -30,13 +30,11 @@ type OutputPort = gasket::messaging::OutputPort<model::EnrichedBlockPayload>;
 pub struct Config {
     pub db_path: String,
     pub consumed_ring_path: Option<String>,
-    pub produced_ring_path: Option<String>,
 }
 
 impl Config {
     pub fn boostrapper(mut self, policy: &crosscut::policies::RuntimePolicy, blocks: &crosscut::historic::BlockConfig) -> Bootstrapper {
         self.consumed_ring_path = Some(blocks.consumed_ring_path.clone());
-        self.produced_ring_path = Some(blocks.produced_ring_path.clone());
 
         Bootstrapper {
             config: self,
@@ -69,7 +67,6 @@ impl Bootstrapper {
             policy: self.policy,
             db: None,
             consumed_ring: None,
-            produced_ring: None,
             last_db_prune_time: None,
             input: self.input,
             output: self.output,
@@ -96,7 +93,6 @@ pub struct Worker {
     policy: crosscut::policies::RuntimePolicy,
     db: Option<sled::Db>,
     consumed_ring: Option<sled::Db>,
-    produced_ring: Option<sled::Db>,
     last_db_prune_time: Option<std::time::Instant>,
     input: InputPort,
     output: OutputPort,
@@ -193,48 +189,33 @@ fn prune_tree(db: &sled::Db) {
 }
 
 impl Worker {
-    fn clean_dbs(&mut self) -> Option<()> {
-        match self.db_refs_all() {
-            Ok(inner) => {
-                match inner {
-                    Some((_, produced_ring, consumed_ring)) => {
-                        match self.last_db_prune_time {
-                            None => {
-                                self.last_db_prune_time = Some(std::time::Instant::now());
-                                Some(())
-                            },
-                            Some(last_pruned) => {
-                                if last_pruned.elapsed() > Duration::from_secs(120) {
-                                    //prune_tree(produced_ring);
-                                    //prune_tree(consumed_ring);
-                                    // todo one day we will prune again
-                                    self.last_db_prune_time = Some(std::time::Instant::now());
-                                    Some(())
-                                } else {
-                                    None
-                                }
-
-                            }
-                        }
-
-                    }
-                    _ => {
-                        self.last_db_prune_time = Some(std::time::Instant::now());
-                        Some(())
-                    }
-                }
-            },
-            Err(_) => {
+    fn clean_consumed_ring(&mut self) -> Option<()> {
+        let consumed_ring = self.db_ref_consumed_ring().unwrap();
+        match self.last_db_prune_time {
+            None => {
                 self.last_db_prune_time = Some(std::time::Instant::now());
                 Some(())
+            },
+            Some(last_pruned) => {
+                if last_pruned.elapsed() > Duration::from_secs(120) {
+                    // todo one day we will prune again
+                    //prune_tree(consumed_ring);
+                    self.last_db_prune_time = Some(std::time::Instant::now());
+                    Some(())
+                } else {
+                    None
+                }
+
             }
+
         }
+
     }
 
-    fn db_refs_all(&self) -> Result<Option<(&sled::Db, &sled::Db, &sled::Db)>, ()> {
-        match (self.db_ref_main(), self.db_ref_produced_ring(), self.db_ref_consumed_ring()) {
-            (Some(db), Some(produced_ring), Some(consumed_ring)) => {
-                Ok(Some((db, produced_ring, consumed_ring)))
+    fn db_refs_all(&self) -> Result<Option<(&sled::Db, &sled::Db)>, ()> {
+        match (self.db_ref_main(), self.db_ref_consumed_ring()) {
+            (Some(db), Some(consumed_ring)) => {
+                Ok(Some((db, consumed_ring)))
             },
             _ => Err(())
         }
@@ -247,23 +228,15 @@ impl Worker {
         }
     }
 
-    fn db_ref_produced_ring(&self) -> Option<&sled::Db> {
-        match self.produced_ring.as_ref() {
-            None => None,
-            Some(db) => Some(db)
-        }
-    }
-
     fn db_ref_consumed_ring(&self) -> Option<&sled::Db> {
-        match self.produced_ring.as_ref() {
+        match self.consumed_ring.as_ref() {
             None => None,
             Some(db) => Some(db)
         }
     }
 
-    fn insert_produced_utxos(&self, db: &sled::Db, produced_ring: &sled::Db, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
+    fn insert_produced_utxos(&self, db: &sled::Db, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
         let mut insert_batch = sled::Batch::default();
-        let mut rollback_insert_batch = sled::Batch::default();
 
         for tx in txs.iter() {
             for (idx, output) in tx.produces() {
@@ -273,37 +246,28 @@ impl Worker {
                 let body = output.encode();
                 let value: IVec = SledTxValue(era, body).try_into()?;
 
-                rollback_insert_batch.insert(key.as_bytes(), IVec::default());
                 insert_batch.insert(key.as_bytes(), value)
             }
         }
 
-        let batch_results = match (db.apply_batch(insert_batch).or_retry(),
-                                   produced_ring.apply_batch(rollback_insert_batch).or_retry()) {
-            (Ok(()), Ok(())) => Ok(()),
-            _ => Err(crate::Error::storage("failed to apply batches".to_string())),
-        };
+        let batch_results = db.apply_batch(insert_batch).or_retry();
 
         self.inserts_counter.inc(txs.len() as u64);
 
-        batch_results
+        batch_results.map_err(crate::Error::storage)
     }
 
-    fn remove_produced_utxos(&self, db: &sled::Db, produced_ring: &sled::Db, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
-        let mut insert = sled::Batch::default();
-        let mut rollback_remove = sled::Batch::default();
+    fn remove_produced_utxos(&self, db: &sled::Db, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
+        let mut remove_batch = sled::Batch::default();
 
         for tx in txs.iter() {
             for (idx, _) in tx.produces() {
-                insert.remove(format!("{}#{}", tx.hash(), idx).as_bytes());
-                rollback_remove.remove(format!("{}#{}", tx.hash(), idx).as_bytes());
+                remove_batch.remove(format!("{}#{}", tx.hash(), idx).as_bytes());
             }
         }
 
-        match (produced_ring.apply_batch(rollback_remove), db.apply_batch(insert)) {
-            (Ok(()), Ok(())) => Ok(()),
-            _ => Err(crate::Error::storage("failed to apply batches".to_string()))
-        }
+        self.remove_counter.inc(txs.len() as u64);
+        db.apply_batch(remove_batch).map_err(crate::Error::storage)
     }
 
     #[inline]
@@ -343,7 +307,7 @@ impl Worker {
             .map_err(crate::Error::storage)
     }
 
-    fn remove_consumed_utxos(&self, db: &sled::Db, consumed_ring: &sled::Db, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
+    fn remove_consumed_utxos(&self, db: &sled::Db, consumed_ring: &sled::Db, txs: &[MultiEraTx]) -> Result<(), ()> {
         let mut remove_batch = sled::Batch::default();
         let mut current_values_batch = sled::Batch::default();
 
@@ -363,17 +327,15 @@ impl Worker {
             remove_batch.remove(key.to_string().as_bytes());
         }
 
-        let result = match (db.apply_batch(remove_batch),
+        let result: Result<(), ()> = match (db.apply_batch(remove_batch),
                consumed_ring.apply_batch(current_values_batch)) {
             (Ok(()), Ok(())) => Ok(()),
-            (Ok(()), Err(err3)) => Err(err3),
-            (Err(err2), Ok(())) => Err(err2),
-            (Err(err1), Err(_)) => Err(err1)
+            _ => Err(())
         };
 
         self.remove_counter.inc(keys.len() as u64);
 
-        result.map_err(crate::Error::storage)
+        result
     }
 
     fn update_last_prune_time(&mut self) {
@@ -400,14 +362,12 @@ impl Worker {
 
         let result = match (db.apply_batch(insert_batch), consumed_ring.apply_batch(remove_batch)) {
             (Ok(_), Ok(_)) => Ok(()),
-            (Ok(_), Err(err2)) => Err(err2),
-            (Err(err3), Ok(_)) => Err(err3),
-            (Err(_), Err(err1)) => Err(err1)
+            _ => Err(crate::Error::storage("failed to roll back consumed utxos"))
         };
 
         self.inserts_counter.inc(txs.len() as u64);
 
-        result.map_err(crate::Error::storage)
+        result
     }
 }
 
@@ -433,7 +393,7 @@ impl gasket::runtime::Worker for Worker {
 
         let all_dbs = all_dbs.unwrap();
 
-        if let Some((db, produced_ring, consumed_ring)) = all_dbs {
+        if let Some((db, consumed_ring)) = all_dbs {
             match msg.payload {
                 model::RawBlockPayload::RollForward(cbor) => {
                     let block = MultiEraBlock::decode(&cbor)
@@ -448,13 +408,12 @@ impl gasket::runtime::Worker for Worker {
 
                     let txs = &block.txs();
 
-                    self.insert_produced_utxos(db, produced_ring, txs).or_panic()?;
+                    self.insert_produced_utxos(db, txs).or_panic()?;
                     let ctx = self.par_fetch_referenced_utxos(db, &txs).or_panic()?;
 
                     // and finally we remove utxos consumed by the block
-                    self.remove_consumed_utxos(db, consumed_ring, &txs).or_restart()?;
-
-                    self.clean_dbs();
+                    self.remove_consumed_utxos(db, consumed_ring, &txs).expect("todo panic");
+                    self.clean_consumed_ring();
 
                     self.output
                         .send(model::EnrichedBlockPayload::roll_forward(cbor, ctx))?;
@@ -478,12 +437,12 @@ impl gasket::runtime::Worker for Worker {
                                 let txs = block.txs();
 
                                 // Revert Anything to do with this block
-                                self.remove_produced_utxos(db, produced_ring, &txs).expect("todo: panic error");
+                                self.remove_produced_utxos(db, &txs).expect("todo: panic error");
                                 self.replace_consumed_utxos(db, consumed_ring, &txs).expect("todo: panic error");
 
                                 ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
 
-                                self.clean_dbs();
+                                self.clean_consumed_ring();
                             }
                             Err(_) => {
                                 log::warn!("THIS SHOULD NEBVER SHOW UP ANYWHERE")
@@ -508,19 +467,14 @@ impl gasket::runtime::Worker for Worker {
     }
 
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
-        log::warn!("opening db1");
         let db = sled::open(&self.config.db_path).or_retry()?;
         let consumed_ring = sled::open(self.config.consumed_ring_path.clone().unwrap_or_default()).or_retry()?;
-        let produced_ring = sled::open(self.config.produced_ring_path.clone().unwrap_or_default()).or_retry()?;
 
         self.last_db_prune_time = Some(std::time::Instant::now());
 
         self.db = Some(db);
         self.consumed_ring = Some(consumed_ring);
-        self.produced_ring = Some(produced_ring);
-
-        log::warn!("alldb opened");
-
+        
         Ok(())
     }
 
