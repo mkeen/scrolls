@@ -102,9 +102,8 @@ fn shutdown(pipeline: bootstrap::Pipeline) {
     }
 }
 
-pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::Error> {
+pub async fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::Error> {
     let mut process_cancelled = false;
-
     tokio::spawn(async move {
         loop {
             tokio::select! {
@@ -117,8 +116,6 @@ pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::E
     });
 
     console::initialize(&args.console);
-
-
 
     let config = ConfigRoot::new(&args.config)
         .map_err(|err| scrolls::Error::ConfigError(format!("{:?}", err)))?;
@@ -149,7 +146,7 @@ pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::E
             log::error!("process killed")
         }
 
-        std::thread::sleep(Duration::from_millis(2000));
+        std::thread::sleep(Duration::from_millis(500));
     }
 
     log::info!("Scrolls is stopping...");
