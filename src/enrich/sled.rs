@@ -203,7 +203,7 @@ impl Worker {
                                 Some(())
                             },
                             Some(last_pruned) => {
-                                if last_pruned.elapsed() > Duration::from_secs(10) {
+                                if last_pruned.elapsed() > Duration::from_secs(60) {
                                     error!("pruning the thing");
                                     prune_tree(produced_ring);
                                     prune_tree(consumed_ring);
