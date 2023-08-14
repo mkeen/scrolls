@@ -70,7 +70,7 @@ impl Bootstrapper {
             db: None,
             consumed_ring: None,
             produced_ring: None,
-            last_db_clean_time: std::time::Instant::now(),
+            last_db_prune_time: None,
             input: self.input,
             output: self.output,
             inserts_counter: Default::default(),
@@ -97,7 +97,7 @@ pub struct Worker {
     db: Option<sled::Db>,
     consumed_ring: Option<sled::Db>,
     produced_ring: Option<sled::Db>,
-    last_db_clean_time: std::time::Instant,
+    last_db_prune_time: Option<std::time::Instant>,
     input: InputPort,
     output: OutputPort,
     inserts_counter: gasket::metrics::Counter,
@@ -192,26 +192,33 @@ fn prune_tree(db: &sled::Db) {
 }
 
 impl Worker {
-    fn clean_dbs(&self) -> Result<(), ()> {
-        let result = match self.db_refs_all() {
+    fn clean_dbs(&mut self) -> Result<(), ()> {
+        match self.db_refs_all() {
             Ok(inner) => {
                 match inner {
                     Some((_, produced_ring, consumed_ring)) => {
-                        if self.last_db_clean_time.elapsed() > Duration::from_secs(240) {
-                            prune_tree(produced_ring);
-                            prune_tree(consumed_ring);
+                        match self.last_db_prune_time {
+                            None => Ok(()),
+                            Some(last_pruned) => {
+                                if last_pruned.elapsed() > Duration::from_secs(248) {
+                                    error!("pruning the thing");
+                                    prune_tree(produced_ring);
+                                    prune_tree(consumed_ring);
+                                    self.last_db_prune_time = Some(std::time::Instant::now());
+                                    Ok(())
+                                } else {
+                                    Err(())
+                                }
+
+                            }
                         }
 
-                        Ok(())
                     }
                     _ => Err(())
                 }
             },
             Err(e) => Err(e)
-        };
-
-        result
-
+        }
     }
 
     fn db_refs_all(&self) -> Result<Option<(&sled::Db, &sled::Db, &sled::Db)>, ()> {
@@ -359,6 +366,10 @@ impl Worker {
         result.map_err(crate::Error::storage)
     }
 
+    fn update_last_prune_time(&mut self) {
+        self.last_db_prune_time = Some(std::time::Instant::now());
+    }
+
     fn replace_consumed_utxos(&self, db: &sled::Db, consumed_ring: &sled::Db, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
         let mut insert_batch = sled::Batch::default();
         let mut remove_batch = sled::Batch::default();
@@ -491,6 +502,8 @@ impl gasket::runtime::Worker for Worker {
         let db = sled::open(&self.config.db_path).or_retry()?;
         let consumed_ring = sled::open(self.config.consumed_ring_path.clone().unwrap_or_default()).or_retry()?;
         let produced_ring = sled::open(self.config.produced_ring_path.clone().unwrap_or_default()).or_retry()?;
+
+        self.last_db_prune_time = Some(std::time::Instant::now());
 
         self.db = Some(db);
         self.consumed_ring = Some(consumed_ring);

@@ -8,6 +8,7 @@ use futures::future::err;
 use log::error;
 use tokio::signal;
 use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::task::spawn_blocking;
 use tokio_util::sync::CancellationToken;
 
 use crate::console;
@@ -120,9 +121,6 @@ pub async fn process_shutting_down(proc_cancel: CancellationToken) -> bool {
 }
 
 pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::Error> {
-
-    console::initialize(&args.console);
-
     let config = ConfigRoot::new(&args.config)
         .map_err(|err| scrolls::Error::ConfigError(format!("{:?}", err)))?;
 
@@ -148,7 +146,13 @@ pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::E
     let mut started_cancel = false;
 
     while !should_stop(&pipeline) && !started_cancel {
-        console::refresh(&args.console, &pipeline);
+        let output = spawn_blocking(|| {
+            console::initialize(&args.console);
+            console::refresh(&args.console, &pipeline);
+        });
+
+        // Do other things while the blocking task is running.
+        let result = block_on(output);
 
         if !started_cancel && block_on(process_shutting_down(proc_cancel.clone())) {
             started_cancel = true;
