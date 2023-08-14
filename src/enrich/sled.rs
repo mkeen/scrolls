@@ -164,7 +164,7 @@ fn prune_tree(db: &sled::Db) {
                 loop {
                     match db.get_lt(last_seen_key) {
                         Ok(new_last_seen) => match new_last_seen {
-                            None => {break}
+                            None => break,
                             Some((new_last_seen_v, _)) => {
                                 last_seen_key = new_last_seen_v.clone();
                                 if skipped > 50000 {
@@ -175,7 +175,7 @@ fn prune_tree(db: &sled::Db) {
                                 skipped += 1;
                             }
                         }
-                        Err(_) => {break}
+                        Err(_) => break
                     }
                 }
 
@@ -204,7 +204,6 @@ impl Worker {
                             },
                             Some(last_pruned) => {
                                 if last_pruned.elapsed() > Duration::from_secs(60) {
-                                    error!("pruning the thing");
                                     prune_tree(produced_ring);
                                     prune_tree(consumed_ring);
                                     self.last_db_prune_time = Some(std::time::Instant::now());
