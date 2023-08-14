@@ -42,7 +42,6 @@ impl Worker {
         block: &'b Vec<u8>,
         rollback: bool,
         ctx: &model::BlockContext,
-
     ) -> Result<(), gasket::error::Error> {
         let block = MultiEraBlock::decode(block)
             .map_err(crate::Error::cbor)
@@ -95,7 +94,6 @@ impl gasket::runtime::Worker for Worker {
                 self.reduce_block(&block, false, &ctx)?
             }
             model::EnrichedBlockPayload::RollBack(block, ctx) => {
-                error!("running rollback reducers {}", block.len());
                 self.reduce_block(&block, true, &ctx)?
             }
         }

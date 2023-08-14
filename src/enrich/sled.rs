@@ -220,7 +220,6 @@ impl Worker {
                     }
                     _ => Err(())
                 }
-
             },
             Err(e) => Err(e)
         };

@@ -115,12 +115,6 @@ impl Worker {
                     }
                 }
 
-                if !sent_block {
-                    let empty: Vec<u8> = vec![];
-                    self.output
-                        .send(model::RawBlockPayload::roll_back(empty))?;
-                }
-
                 Ok(())
             }
         }
