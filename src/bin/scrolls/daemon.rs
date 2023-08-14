@@ -2,6 +2,8 @@ use clap;
 use scrolls::{bootstrap, crosscut, enrich, reducers, sources, storage};
 use serde::Deserialize;
 use std::time::Duration;
+use tokio::signal;
+use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::console;
 
@@ -102,8 +104,6 @@ fn shutdown(pipeline: bootstrap::Pipeline) {
 pub fn run(args: &Args) -> Result<(), scrolls::Error> {
     console::initialize(&args.console);
 
-
-
     let config = ConfigRoot::new(&args.config)
         .map_err(|err| scrolls::Error::ConfigError(format!("{:?}", err)))?;
 
@@ -127,7 +127,6 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
     log::info!("scrolls is running...");
 
     while !should_stop(&pipeline) {
-
         console::refresh(&args.console, &pipeline);
         std::thread::sleep(Duration::from_millis(2000));
     }
