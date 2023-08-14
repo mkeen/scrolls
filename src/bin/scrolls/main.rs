@@ -15,7 +15,7 @@ enum Scrolls {
     Daemon(daemon::Args),
 }
 
-async fn random() {
+fn random() {
     println!("hi there")
 }
 
@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             tokio::select! {
                 _ = signal::ctrl_c() => {
-                    let _ = random();
+                    random();
                 },
             }
         }
