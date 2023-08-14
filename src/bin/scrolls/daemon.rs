@@ -43,7 +43,7 @@ struct ConfigRoot {
     finalize: Option<crosscut::FinalizeConfig>,
     chain: Option<ChainConfig>,
     policy: Option<crosscut::policies::RuntimePolicy>,
-    blocks: Option<crosscut::blocks::Config>,
+    blocks: Option<crosscut::historic::BlockConfig>,
 }
 
 impl ConfigRoot {

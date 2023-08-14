@@ -5,15 +5,15 @@ use crate::Error;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub struct Config {
+pub struct BlockConfig {
     pub db_path: String,
     pub consumed_ring_path: String,
     pub produced_ring_path: String,
 }
 
-impl Default for Config {
+impl Default for BlockConfig {
     fn default() -> Self {
-        Config {
+        BlockConfig {
             db_path: "/opt/scrolls/block_buffer".to_string(),
             consumed_ring_path: "/opt/scrolls/consumed_buffer".to_string(),
             produced_ring_path: "/opt/scrolls/produced_buffer".to_string(),
@@ -21,24 +21,24 @@ impl Default for Config {
     }
 }
 
-impl From<Config> for RollbackData {
-    fn from(config: Config) -> Self {
-        RollbackData::open_db(config)
+impl From<BlockConfig> for BufferBlocks {
+    fn from(config: BlockConfig) -> Self {
+        BufferBlocks::open_db(config)
     }
 }
 
 #[derive(Clone)]
-pub struct RollbackData {
+pub struct BufferBlocks {
     db: Option<sled::Db>,
     db_depth: Option<usize>,
     queue: Vec<Vec<u8>>,
 }
 
-impl RollbackData {
-    fn open_db(config: Config) -> Self {
+impl BufferBlocks {
+    fn open_db(config: BlockConfig) -> Self {
         let db = sled::open(config.db_path).or_retry().unwrap();
 
-        RollbackData {
+        BufferBlocks {
             db_depth: Some(db.len() as usize), // o(n) to get the initial size, but should only be called once
             db: Some(db),
             queue: Vec::default(),
