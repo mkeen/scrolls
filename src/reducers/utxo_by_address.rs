@@ -185,7 +185,7 @@ impl Reducer {
         // Spend Native Tokens
         for asset in utxo.non_ada_assets() {
             if let Asset::NativeAsset(policy_id, asset_name, quantity) = asset.clone() {
-                let policy_id = hex::encode(PolicyId::from(*policy_id));
+                let policy_id = hex::encode(PolicyId::from(*policy_id).to_ascii_lowercase());
                 let asset_name = hex::encode(asset_name);
 
                 if let Ok(fingerprint) = asset_fingerprint([policy_id.as_str(), asset_name.as_str()]) {
