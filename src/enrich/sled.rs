@@ -192,32 +192,32 @@ fn prune_tree(db: &sled::Db) {
 }
 
 impl Worker {
-    fn clean_dbs(&mut self) -> Result<(), ()> {
+    fn clean_dbs(&mut self) -> Option<()> {
         match self.db_refs_all() {
             Ok(inner) => {
                 match inner {
                     Some((_, produced_ring, consumed_ring)) => {
                         match self.last_db_prune_time {
-                            None => Ok(()),
+                            None => Some(()),
                             Some(last_pruned) => {
                                 if last_pruned.elapsed() > Duration::from_secs(248) {
                                     error!("pruning the thing");
                                     prune_tree(produced_ring);
                                     prune_tree(consumed_ring);
                                     self.last_db_prune_time = Some(std::time::Instant::now());
-                                    Ok(())
+                                    Some(())
                                 } else {
-                                    Err(())
+                                    None
                                 }
 
                             }
                         }
 
                     }
-                    _ => Err(())
+                    _ => None
                 }
             },
-            Err(e) => Err(e)
+            Err(_) => None
         }
     }
 
@@ -444,7 +444,7 @@ impl gasket::runtime::Worker for Worker {
                     // and finally we remove utxos consumed by the block
                     self.remove_consumed_utxos(db, consumed_ring, &txs).or_restart()?;
 
-                    let _cleaned = self.clean_dbs();
+                    self.clean_dbs().expect("todo panic");
 
                     self.output
                         .send(model::EnrichedBlockPayload::roll_forward(cbor, ctx))?;
@@ -473,7 +473,7 @@ impl gasket::runtime::Worker for Worker {
 
                                 ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
 
-                                let _cleaned = self.clean_dbs().expect("todo panic");
+                                self.clean_dbs().expect("todo panic");
                             }
                             Err(_) => {
                                 log::warn!("THIS SHOULD NEBVER SHOW UP ANYWHERE")
