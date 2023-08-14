@@ -158,8 +158,6 @@ fn fetch_referenced_utxo<'a>(
 
 #[inline]
 fn prune_tree(db: &sled::Db) {
-
-
     let mut keys_to_drop: Vec<sled::IVec> = vec![];
     let mut drop_keys_batch = sled::Batch::default();
 
@@ -197,48 +195,7 @@ fn prune_tree(db: &sled::Db) {
             }
         }
         Err(_) => {}
-    }
-
-
-
-    while count < 1000000 {
-
-
-
-        match db.iter().next() {
-            None => {
-                count = 1000000;
-                continue
-            },
-            Some(next) => {
-                match next {
-                    Ok((key, _)) => {
-                        count += 1;
-                        if count <= 500000 {
-                            keys_to_drop.push(key)
-                        } else {
-                            above_count += 1;
-                        }
-                    }
-                    Err(_) => {
-                        count = 1000000;
-                        continue
-                    }
-                }
-            }
-        }
-    }
-
-    if above_count >= 500000 {
-        for k in keys_to_drop.clone() {
-            db.remove(k);
-        }
-
-        log::warn!("dropped {} keys", keys_to_drop.len());
-
-
-
-    }
+    };
 
 }
 
