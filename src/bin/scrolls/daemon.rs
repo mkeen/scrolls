@@ -107,19 +107,20 @@ fn shutdown(pipeline: bootstrap::Pipeline) {
     }
 }
 
-pub async fn forced_shutdown() -> bool {
-    let mut process_shutdown = false;
+#[inline]
+pub async fn process_shutting_down(proc_cancel: CancellationToken) -> bool {
+    let mut process_cancelled = false;
 
     tokio::select! {
-                _ = tokio::signal::ctrl_c() => {
-                    process_shutdown = true;
-                },
-            }
+        _ = proc_cancel.cancelled() => {
+            process_cancelled = true;
+        }
+    }
 
-    process_shutdown
+    process_cancelled
 }
 
-pub async fn run(args: &Args) -> Result<(), scrolls::Error> {
+pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::Error> {
 
     console::initialize(&args.console);
 
@@ -150,7 +151,7 @@ pub async fn run(args: &Args) -> Result<(), scrolls::Error> {
     while !started_cancel && !should_stop(&pipeline) {
         console::refresh(&args.console, &pipeline);
 
-        if !started_cancel && block_on(forced_shutdown()) {
+        if !started_cancel && block_on(process_shutting_down(proc_cancel.clone())) {
             started_cancel = true
         }
 
