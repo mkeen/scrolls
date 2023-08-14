@@ -205,12 +205,9 @@ impl Worker {
         let result = match self.db_refs_all() {
             Ok(inner) => {
                 match inner {
-                    Some((db, produced_ring, consumed_ring)) => {
-                        db.flush().or_retry().expect("panic");
+                    Some((_, produced_ring, consumed_ring)) => {
                         prune_tree(produced_ring);
-                        produced_ring.flush().or_retry().expect("panic");
                         prune_tree(consumed_ring);
-                        consumed_ring.flush().or_retry().expect("panic");
                         Ok(())
                     }
                     _ => Err(())
@@ -254,8 +251,6 @@ impl Worker {
     }
 
     fn insert_produced_utxos(&self, db: &sled::Db, produced_ring: &sled::Db, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
-        log::warn!("annotating tx");
-
         let mut insert_batch = sled::Batch::default();
         let mut rollback_insert_batch = sled::Batch::default();
 
@@ -267,8 +262,6 @@ impl Worker {
                 let body = output.encode();
                 let value: IVec = SledTxValue(era, body).try_into()?;
 
-                log::warn!("annotating tx in");
-
                 rollback_insert_batch.insert(key.as_bytes(), IVec::default());
                 insert_batch.insert(key.as_bytes(), value)
             }
@@ -279,8 +272,6 @@ impl Worker {
             (Ok(()), Ok(())) => Ok(()),
             _ => Err(crate::Error::storage("failed to apply batches".to_string())),
         };
-
-        log::warn!("wtd");
 
         self.inserts_counter.inc(txs.len() as u64);
 

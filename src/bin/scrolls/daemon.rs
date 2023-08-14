@@ -158,6 +158,7 @@ pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::E
 
     shutdown(pipeline);
     blocks.close();
+    // todo flush connections for sled enricher
 
     log::error!("Scrolls has exited normally...");
 
