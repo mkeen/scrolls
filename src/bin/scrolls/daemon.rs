@@ -4,6 +4,7 @@ use serde::Deserialize;
 use std::time::Duration;
 use tokio::signal;
 use tokio::sync::mpsc::UnboundedReceiver;
+use tokio_util::sync::CancellationToken;
 
 use crate::console;
 
@@ -101,8 +102,23 @@ fn shutdown(pipeline: bootstrap::Pipeline) {
     }
 }
 
-pub fn run(args: &Args) -> Result<(), scrolls::Error> {
+pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::Error> {
+    let mut process_cancelled = false;
+
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                // Step 3: Using cloned token to listen to cancellation requests
+                _ = proc_cancel.cancelled() => {
+                    process_cancelled = true;
+                }
+            }
+        }
+    });
+
     console::initialize(&args.console);
+
+
 
     let config = ConfigRoot::new(&args.config)
         .map_err(|err| scrolls::Error::ConfigError(format!("{:?}", err)))?;
@@ -128,6 +144,11 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
 
     while !should_stop(&pipeline) {
         console::refresh(&args.console, &pipeline);
+
+        if process_cancelled {
+            log::error!("process killed")
+        }
+
         std::thread::sleep(Duration::from_millis(2000));
     }
 

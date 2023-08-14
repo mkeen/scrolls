@@ -42,6 +42,7 @@ rayon = "1.5.3"
 # async feature
 futures = { version = "0.3.24", optional = true }
 tokio = { version = "1.21.1", features = ["full"], optional = true }
+tokio-util = "0.7.8"
 
 # elastic feature
 elasticsearch = { version = "8.5.0-alpha.1", optional = true }

@@ -3,6 +3,7 @@ use std::process;
 
 use tokio::signal;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 mod console;
 mod daemon;
@@ -21,6 +22,8 @@ fn random() {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let token = CancellationToken::new();
+
     tokio::spawn(async move {
         loop {
             tokio::select! {
@@ -31,8 +34,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let result = match Scrolls::parse() {
-        Scrolls::Daemon(x) => daemon::run(&x),
+    match Scrolls::parse() {
+        Scrolls::Daemon(x) => daemon::run(&x, token),
     };
 
 
