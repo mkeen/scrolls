@@ -23,19 +23,20 @@ fn random() {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let token = CancellationToken::new();
+    let token_daemon = token.clone();
 
     tokio::spawn(async move {
         loop {
             tokio::select! {
                 _ = signal::ctrl_c() => {
-                    random();
+                    token.cancel();
                 },
             }
         }
     });
 
     match Scrolls::parse() {
-        Scrolls::Daemon(x) => daemon::run(&x, token),
+        Scrolls::Daemon(x) => daemon::run(&x, token_daemon),
     };
 
 
