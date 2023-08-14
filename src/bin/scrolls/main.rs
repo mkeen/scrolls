@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             tokio::select! {
                 _ = tokio::signal::ctrl_c() => {
-                    token_daemon.cancel();
+                    token.cancel();
                 },
             }
         }
