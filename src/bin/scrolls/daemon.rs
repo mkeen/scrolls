@@ -132,7 +132,7 @@ pub async fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scro
     while !should_stop(&pipeline) {
         tokio::select! {
             _ = proc_cancel.cancelled() => {
-                println!("WEfwe");
+                println!("efwefwefwefwefwefwef");
                 process_cancelled = true;
             }
         }

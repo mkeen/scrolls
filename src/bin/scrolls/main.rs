@@ -1,7 +1,6 @@
 use clap::Parser;
 use std::process;
 
-use tokio::signal;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -28,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = signal::ctrl_c() => {
+                _ = tokio::signal::ctrl_c() => {
                     token_daemon.cancel();
                 },
             }
@@ -36,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let m = match Scrolls::parse() {
-        Scrolls::Daemon(x) => daemon::run(&x, token).await,
+        Scrolls::Daemon(x) => daemon::run(&x, token_daemon).await,
     };
 
     // if let Err(err) = &result {
