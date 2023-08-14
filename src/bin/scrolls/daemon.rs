@@ -90,7 +90,7 @@ fn should_stop(pipeline: &bootstrap::Pipeline) -> bool {
 }
 
 fn safe_shutdown(pipeline: &bootstrap::Pipeline) {
-    for tether in pipeline.tethers {
+    for tether in &pipeline.tethers {
         error!("!!!! {}", tether.name());
     }
 }
