@@ -175,6 +175,7 @@ fn prune_tree(db: &sled::Db) {
                         Ok(new_last_seen) => match new_last_seen {
                             None => {break}
                             Some((new_last_seen_v, _)) => {
+                                warn!("databvase got too big");
                                 last_seen_key = new_last_seen_v.clone();
                                 if skipped > 100000 {
                                     count += 1;
@@ -200,12 +201,10 @@ fn prune_tree(db: &sled::Db) {
 
 impl Worker {
     fn clean_dbs(&self) -> Result<(), ()> {
-        warn!("cleaning dbs");
         let result = match self.db_refs_all() {
             Ok(inner) => {
                 match inner {
                     Some((db, produced_ring, consumed_ring)) => {
-                        warn!("should clean up");
                         db.flush().or_retry().expect("panic");
                         prune_tree(produced_ring);
                         produced_ring.flush().or_retry().expect("panic");
@@ -219,7 +218,6 @@ impl Worker {
             Err(e) => Err(e)
         };
 
-        warn!("done cleaning dbs");
         result
 
     }
