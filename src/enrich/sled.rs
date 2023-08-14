@@ -162,9 +162,7 @@ fn prune_tree(db: &sled::Db) {
     let mut drop_keys_batch = sled::Batch::default();
 
     let mut count: u64 = 0;
-
-    log::error!("going to look into trimming");
-
+    
     match db.last() {
         Ok(last_result) => match last_result {
             None => {}
