@@ -1,13 +1,8 @@
-use std::any::Any;
 use clap;
 use scrolls::{bootstrap, crosscut, enrich, reducers, sources, storage};
 use serde::Deserialize;
 use std::time::Duration;
 use futures::executor::block_on;
-use futures::future::err;
-use log::error;
-use tokio::signal;
-use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
 
 use crate::console;
@@ -153,7 +148,7 @@ pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::E
 
     let mut started_cancel = false;
 
-    while !should_stop(&pipeline) {
+    while !started_cancel && !should_stop(&pipeline) {
         console::refresh(&args.console, &pipeline);
 
         if !started_cancel && block_on(process_shutting_down(proc_cancel.clone())) {
