@@ -212,7 +212,7 @@ lazy_static! {
 pub fn initialize(mode: &Option<Mode>) {
     match mode {
         Some(Mode::TUI) => log::set_logger(TUI_CONSOLE.deref())
-            .map(|_| log::set_max_level(log::LevelFilter::Info))
+            .map(|_| log::set_max_level(log::LevelFilter::Warn))
             .unwrap(),
         _ => env_logger::init(),
     }
