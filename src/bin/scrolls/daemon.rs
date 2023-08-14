@@ -155,7 +155,7 @@ pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::E
             started_cancel = true
         }
 
-        std::thread::sleep(Duration::from_millis(5000));
+        std::thread::sleep(Duration::from_millis(1100));
     }
 
     log::error!("Scrolls is stopping...");
