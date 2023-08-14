@@ -162,7 +162,7 @@ fn prune_tree(db: &sled::Db) {
     let mut drop_keys_batch = sled::Batch::default();
 
     let mut count: u64 = 0;
-    
+
     match db.last() {
         Ok(last_result) => match last_result {
             None => {}
@@ -176,7 +176,7 @@ fn prune_tree(db: &sled::Db) {
                             None => {break}
                             Some((new_last_seen_v, _)) => {
                                 last_seen_key = new_last_seen_v.clone();
-                                if skipped > 100 {
+                                if skipped > 50000 {
                                     count += 1;
                                     trim_batch.remove(new_last_seen_v)
                                 }
