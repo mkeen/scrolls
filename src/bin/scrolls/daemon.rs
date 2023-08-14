@@ -1,8 +1,11 @@
+use std::any::Any;
 use clap;
 use scrolls::{bootstrap, crosscut, enrich, reducers, sources, storage};
 use serde::Deserialize;
 use std::time::Duration;
 use futures::executor::block_on;
+use futures::future::err;
+use log::error;
 use tokio::signal;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
@@ -86,15 +89,17 @@ fn should_stop(pipeline: &bootstrap::Pipeline) -> bool {
         })
 }
 
+fn safe_shutdown(pipeline: &bootstrap::Pipeline) {
+    for tether in pipeline.tethers {
+        error!("!!!! {}", tether.name());
+    }
+}
+
 fn shutdown(pipeline: bootstrap::Pipeline) {
     for tether in pipeline.tethers {
-        if tether.name() == "n2n" {
-            let state = tether.check_state();
-            log::warn!("dismissing stage: {} with state {:?}", tether.name(), state);
-            tether.dismiss_stage().expect("stage stops");
-        }
-
-
+        let state = tether.check_state();
+        log::warn!("dismissing stage: {} with state {:?}", tether.name(), state);
+        tether.dismiss_stage().expect("stage stops");
 
         // Can't join the stage because there's a risk of deadlock, usually
         // because a stage gets stuck sending into a port which depends on a
@@ -148,11 +153,12 @@ pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::E
 
     let mut started_cancel = false;
 
-    while !should_stop(&pipeline) && !started_cancel {
+    while !should_stop(&pipeline) {
         console::refresh(&args.console, &pipeline);
 
         if !started_cancel && block_on(process_shutting_down(proc_cancel.clone())) {
-            started_cancel = true
+            //started_cancel = true
+            safe_shutdown(&pipeline);
         }
 
         std::thread::sleep(Duration::from_millis(5000));
