@@ -12,7 +12,8 @@ enum Scrolls {
     Daemon(daemon::Args),
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = match Scrolls::parse() {
         Scrolls::Daemon(x) => daemon::run(&x),
     };
@@ -22,7 +23,6 @@ fn main() {
         process::exit(1);
     }
 
-    println!("goodbye");
-
-    process::exit(0);
+    Ok(())
 }
+
