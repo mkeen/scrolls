@@ -210,7 +210,7 @@ impl gasket::runtime::Worker for Worker {
             false => self.await_next()?,
         };
 
-        return Ok(gasket::runtime::WorkOutcome::Idle);
+        return Ok(gasket::runtime::WorkOutcome::Done);
 
         // see if we have points that already reached certain depth
         let ready = self.chain_buffer.pop_with_depth(self.min_depth);
