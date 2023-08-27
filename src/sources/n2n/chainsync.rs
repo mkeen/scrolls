@@ -203,17 +203,15 @@ impl gasket::runtime::Worker for Worker {
 
         if let Ok(block) = self.blocks.rollback_pop() {
             if let Some(block) = block {
-                log::warn!("got block from rollback queue");
+                started_rollback = true;
                 self.output.send(model::RawBlockPayload::roll_back(block))?;
                 self.block_count.inc(1);
             }
 
         }
 
-        let depth = self.blocks.rollback_queue_depth();
-
         if started_rollback {
-            if depth == 0 {
+            if self.blocks.rollback_queue_depth() == 0 {
                 if let Some(cbor) =  self.blocks.tip_block() {
                     if let Ok(block) = MultiEraBlock::decode(&cbor) {
                         //self.chain_buffer.roll_forward(
