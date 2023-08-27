@@ -213,6 +213,7 @@ impl gasket::runtime::Worker for Worker {
                 Ok(block) => match block {
                     None => break,
                     Some(block) => {
+                        log::warn!("got block from rollback queue");
                         blocks_to_roll_back.push(block.to_vec());
                     }
                 },
