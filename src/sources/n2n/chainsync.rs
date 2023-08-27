@@ -212,7 +212,30 @@ impl gasket::runtime::Worker for Worker {
 
         // see if we have points that already reached certain depth
         let ready = self.chain_buffer.pop_with_depth(self.min_depth);
-        log::warn!("found {} points with required min depth -- also -- {}", ready.len(), self.chain_buffer.latest().unwrap().slot_or_default());
+
+        let point: Option<Point> = match self.chain_buffer.latest() {
+            None => {
+                match self.blocks.tip_block() {
+                    None => {None}
+                    Some(tip_block) => {
+                        let block = MultiEraBlock::decode(tip_block.as_slice())
+                            .map_err(crate::Error::cbor)
+                            .apply_policy(&self.policy)
+                            .or_panic()?;
+
+                        match block {
+                            None => None,
+                            Some(block) => Some(Point::Specific(block.slot(), block.hash().to_vec()))
+                        }
+                    }
+                }
+
+            },
+            Some(tip) => Some(tip.clone())
+        };
+
+
+        log::warn!("found {} points with required min depth -- also -- {}, and... {}", ready.len(), self.chain_buffer.latest().unwrap().slot_or_default(), point.unwrap().slot_or_default());
 
         // request download of blocks for confirmed points
         for point in ready {

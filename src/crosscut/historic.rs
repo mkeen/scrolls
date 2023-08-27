@@ -82,6 +82,20 @@ impl BufferBlocks {
         }
     }
 
+    pub fn tip_block(&self) -> Option<Vec<u8>> {
+        match self.get_db_ref().last() {
+            Ok(result) => {
+                match result {
+                    Some((_, block)) => {
+                        Some(block.to_vec())
+                    },
+                    None => None
+                }
+            }
+            Err(_) => None
+        }
+    }
+
     pub fn enqueue_rollback_batch(&mut self, from: &Point) -> Vec<Vec<u8>> {
         let blocks = self.get_rollback_range(from);
 
