@@ -105,6 +105,14 @@ impl Worker {
             chainsync::RollbackEffect::OutOfScope => {
                 // todo instead return "None" and just be normal
                 self.blocks.enqueue_rollback_batch(point);
+                if let Some(cbor) =  self.blocks.tip_block() {
+                    if let Ok(block) = MultiEraBlock::decode(&cbor) {
+                        self.chain_buffer.roll_forward(
+                            Point::Specific(block.slot(), block.hash().to_vec())
+                        ); // todo maybe remove this roll forward
+                    }
+                }
+
                 log::warn!("rolling backward from point {:?}", point);
 
                 Ok(())
@@ -130,6 +138,7 @@ impl Worker {
             }
             chainsync::NextResponse::RollBackward(p, t) => {
                 self.on_rollback(&p)?;
+                self.chain_tip.set(t.1 as i64);
                 Ok(())
             }
             chainsync::NextResponse::Await => {
@@ -157,6 +166,7 @@ impl Worker {
             }
             chainsync::NextResponse::RollBackward(p, t) => {
                 self.on_rollback(&p)?;
+                self.chain_tip.set(t.1 as i64);
                 Ok(())
             }
             _ => unreachable!("protocol invariant not respected in chain-sync state machine"),
@@ -214,12 +224,52 @@ impl gasket::runtime::Worker for Worker {
                 Some(block) => {
                     log::warn!("got block from rollback queue");
                     started_rollback = true;
-                    self.output.send(model::RawBlockPayload::roll_back(block))?
+                    self.output.send(model::RawBlockPayload::roll_back(block))?;
                 }
             },
             Err(_) => {
                 ()
             }
+        }
+
+        log::warn!("I am now working");
+
+        if started_rollback {
+            let depth = self.blocks.rollback_queue_depth();
+            if crosscut::should_finalize(&self.finalize, &Point::Origin, depth > 0, started_rollback) {
+                log::warn!("sending done");
+
+                return Ok(gasket::runtime::WorkOutcome::Done);
+            }
+
+        } else {
+            for point in ready {
+                log::debug!("requesting block fetch for point {:?}", point);
+
+                let block = self
+                    .blockfetch
+                    .as_mut()
+                    .unwrap()
+                    .fetch_single(point.clone())
+                    .or_restart()?;
+
+                self.blocks.insert_block(&point, &block);
+
+                self.output
+                    .send(model::RawBlockPayload::roll_forward(block))?;
+
+                self.block_count.inc(1);
+
+                // evaluate if we should finalize the thread according to config
+                let depth = self.blocks.rollback_queue_depth();
+                if crosscut::should_finalize(&self.finalize, &point, depth > 0, started_rollback) {
+                    log::warn!("sending done");
+
+                    return Ok(gasket::runtime::WorkOutcome::Done);
+                }
+
+            }
+
         }
 
         // let rollback_to_point: Option<Point> = match self.chain_buffer.latest() {
@@ -253,35 +303,11 @@ impl gasket::runtime::Worker for Worker {
 
 
 
-        log::warn!("I am now working");
+
 
 
         // request download of blocks for confirmed points
-        for point in ready {
-            log::debug!("requesting block fetch for point {:?}", point);
 
-            let block = self
-                .blockfetch
-                .as_mut()
-                .unwrap()
-                .fetch_single(point.clone())
-                .or_restart()?;
-
-            self.blocks.insert_block(&point, &block);
-
-            self.output
-                .send(model::RawBlockPayload::roll_forward(block))?;
-
-            self.block_count.inc(1);
-
-            // evaluate if we should finalize the thread according to config
-            let depth = self.blocks.rollback_queue_depth();
-            if crosscut::should_finalize(&self.finalize, &point, depth > 0, started_rollback) {
-                log::warn!("sending done");
-
-                return Ok(gasket::runtime::WorkOutcome::Done);
-            }
-        }
 
         log::warn!("I am now saying i am busy");
 
