@@ -450,10 +450,13 @@ impl gasket::runtime::Worker for Worker {
                         log::warn!("possibly sending dirty event back enrich data");
                     }
 
-                    self.output
-                        .send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
+                    if cbor.len() > 0 {
+                        self.output
+                            .send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
 
-                    self.blocks_counter.inc(1);
+                        self.blocks_counter.inc(1);
+                    }
+
                 }
             };
         } else {
