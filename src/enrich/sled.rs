@@ -420,8 +420,6 @@ impl gasket::runtime::Worker for Worker {
 
                 }
                 model::RawBlockPayload::RollBack(cbor) => {
-                    log::warn!("rolling back enrich data");
-
                     if !cbor.is_empty() {
                         let block = MultiEraBlock::decode(&cbor)
                             .map_err(crate::Error::cbor)
@@ -451,7 +449,7 @@ impl gasket::runtime::Worker for Worker {
                     } else {
                         log::warn!("possibly sending dirty event back enrich data");
                     }
-                    
+
                     self.output
                         .send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
 

@@ -90,6 +90,7 @@ impl gasket::runtime::Worker for Worker {
                 self.reduce_block(&block, false, &ctx)?
             }
             model::EnrichedBlockPayload::RollBack(block, ctx) => {
+                log::warn!("calling reducers for enriched rollback block");
                 self.reduce_block(&block, true, &ctx)?
             }
         }
