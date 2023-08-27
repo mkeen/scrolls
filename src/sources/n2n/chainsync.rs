@@ -105,10 +105,11 @@ impl Worker {
             chainsync::RollbackEffect::OutOfScope => {
                 if let Some(current_tip_block) = self.blocks.tip_block() {
                     if let Ok(block) = MultiEraBlock::decode(&current_tip_block) {
-                        self.blocks.enqueue_rollback_batch(point);
-                        self.chain_buffer.roll_forward(
-                            Point::Specific(block.slot(), block.hash().to_vec())
-                        )
+                        if self.blocks.enqueue_rollback_batch(point) > 0 {
+                            self.chain_buffer.roll_forward(
+                                Point::Specific(block.slot(), block.hash().to_vec())
+                            )
+                        }
                     }
                 }
                 Ok(())
