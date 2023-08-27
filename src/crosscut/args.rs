@@ -178,6 +178,10 @@ pub fn should_finalize(
     }
 
     if let Some(max) = config.max_block_slot {
+        if rollback_was_started {
+            return remaining_rollback;
+        }
+
         if last_point.slot_or_default() >= max {
             return true;
         }
@@ -189,11 +193,7 @@ pub fn should_finalize(
     //     }
     // }
 
-    if rollback_was_started {
-        return remaining_rollback;
-    } else {
-        return false;
-    }
+    false
 }
 
 /// Well-known information about the blockhain network

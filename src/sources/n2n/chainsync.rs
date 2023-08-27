@@ -237,7 +237,7 @@ impl gasket::runtime::Worker for Worker {
         if started_rollback {
             let depth = self.blocks.rollback_queue_depth();
             if crosscut::should_finalize(&self.finalize, &Point::Origin, depth > 0, started_rollback) {
-                log::warn!("sending done");
+                log::warn!("sending rollback done");
 
                 return Ok(gasket::runtime::WorkOutcome::Done);
             }
