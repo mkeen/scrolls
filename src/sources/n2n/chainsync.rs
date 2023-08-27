@@ -201,63 +201,56 @@ impl gasket::runtime::Worker for Worker {
 
         let mut started_rollback = false;
 
-        if let Ok(block) = self.blocks.rollback_pop() {
-            if let Some(block) = block {
-                started_rollback = true;
-                self.output.send(model::RawBlockPayload::roll_back(block))?;
-                self.block_count.inc(1);
+        let mut blocks_to_roll_back: Vec<Vec<u8>> = Vec::default();
+
+        loop {
+            match self.blocks.rollback_pop() {
+                Ok(pop_rollback_block) => match pop_rollback_block {
+                    None => break,
+                    Some(block) => {
+                        if block.len() > 0 {
+                            started_rollback = true;
+                            self.output.send(model::RawBlockPayload::roll_back(block))?;
+                            self.block_count.inc(1);
+                        }
+
+                    }
+                }
+                Err(_) => break
             }
 
         }
 
-        if started_rollback {
-            if self.blocks.rollback_queue_depth() == 0 {
-                if let Some(cbor) =  self.blocks.tip_block() {
-                    if let Ok(block) = MultiEraBlock::decode(&cbor) {
-                        //self.chain_buffer.roll_forward(
-                         //   Point::Specific(block.slot(), block.hash().to_vec())
-                        //); // todo maybe remove this roll forward
-                    }
-                }
+        match self.chainsync.as_ref().unwrap().has_agency() {
+            true => self.request_next()?,
+            false => self.await_next()?,
+        };
 
-                log::warn!("still working on rollback");
+        // see if we have points that already reached certain depth
+        let ready = self.chain_buffer.pop_with_depth(self.min_depth);
+
+        for point in ready {
+            log::debug!("requesting block fetch for point {:?}", point);
+
+            let block = self
+                .blockfetch
+                .as_mut()
+                .unwrap()
+                .fetch_single(point.clone())
+                .or_restart()?;
+
+            self.blocks.insert_block(&point, &block);
+
+            self.output.send(model::RawBlockPayload::roll_forward(block))?;
+
+            self.block_count.inc(1);
+
+            // evaluate if we should finalize the thread according to config
+
+            if crosscut::should_finalize(&self.finalize, &point) {
+                log::warn!("sending done");
+
                 return Ok(gasket::runtime::WorkOutcome::Done);
-            }
-
-        } else {
-            match self.chainsync.as_ref().unwrap().has_agency() {
-                true => self.request_next()?,
-                false => self.await_next()?,
-            };
-
-            // see if we have points that already reached certain depth
-            let ready = self.chain_buffer.pop_with_depth(self.min_depth);
-
-            for point in ready {
-                log::debug!("requesting block fetch for point {:?}", point);
-
-                let block = self
-                    .blockfetch
-                    .as_mut()
-                    .unwrap()
-                    .fetch_single(point.clone())
-                    .or_restart()?;
-
-                self.blocks.insert_block(&point, &block);
-
-                self.output
-                    .send(model::RawBlockPayload::roll_forward(block))?;
-
-                self.block_count.inc(1);
-
-                // evaluate if we should finalize the thread according to config
-
-                if crosscut::should_finalize(&self.finalize, &point) {
-                    log::warn!("sending done");
-
-                    return Ok(gasket::runtime::WorkOutcome::Done);
-                }
-
             }
 
         }
