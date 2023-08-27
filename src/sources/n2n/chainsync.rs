@@ -216,6 +216,7 @@ impl gasket::runtime::Worker for Worker {
                     log::warn!("got block from rollback queue");
                     started_rollback = true;
                     self.output.send(model::RawBlockPayload::roll_back(block))?;
+                    self.block_count.inc(1);
                 }
             },
             Err(_) => {
@@ -255,6 +256,7 @@ impl gasket::runtime::Worker for Worker {
                 self.block_count.inc(1);
 
                 // evaluate if we should finalize the thread according to config
+
                 if crosscut::should_finalize(&self.finalize, &point) {
                     log::warn!("sending done");
 
@@ -264,8 +266,6 @@ impl gasket::runtime::Worker for Worker {
             }
 
         }
-
-        log::warn!("I am now saying i am busy");
 
         Ok(gasket::runtime::WorkOutcome::Partial)
     }
