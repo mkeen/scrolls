@@ -212,7 +212,7 @@ impl gasket::runtime::Worker for Worker {
 
         // see if we have points that already reached certain depth
         let ready = self.chain_buffer.pop_with_depth(self.min_depth);
-        log::warn!("found {} points with required min depth", ready.len());
+        log::warn!("found {} points with required min depth -- also -- {}", ready.len(), self.chain_buffer.latest().unwrap().slot_or_default());
 
         // request download of blocks for confirmed points
         for point in ready {
