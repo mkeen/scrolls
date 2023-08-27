@@ -103,17 +103,14 @@ impl Worker {
                 Ok(())
             }
             chainsync::RollbackEffect::OutOfScope => {
-                // todo instead return "None" and just be normal
-                self.blocks.enqueue_rollback_batch(point);
-                log::warn!("rolling backward from point {:?}", point);
-
                 if let Some(current_tip_block) = self.blocks.tip_block() {
-                    let block = MultiEraBlock::decode(&current_tip_block).unwrap();
-                    self.chain_buffer.roll_forward(
-                        Point::Specific(block.slot(), block.hash().to_vec())
-                    )
+                    if let Ok(block) = MultiEraBlock::decode(&current_tip_block) {
+                        self.blocks.enqueue_rollback_batch(point);
+                        self.chain_buffer.roll_forward(
+                            Point::Specific(block.slot(), block.hash().to_vec())
+                        )
+                    }
                 }
-                
                 Ok(())
             }
         }
