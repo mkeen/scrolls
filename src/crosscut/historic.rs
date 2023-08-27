@@ -96,10 +96,8 @@ impl BufferBlocks {
         }
     }
 
-    pub fn enqueue_rollback_batch(&mut self, from: &Point) -> Vec<Vec<u8>> {
-        let blocks = self.get_rollback_range(from);
-
-        blocks
+    pub fn enqueue_rollback_batch(&mut self, from: &Point) {
+        self.queue = self.get_rollback_range(from)
     }
 
     pub fn rollback_pop(&mut self) -> Result<Option<sled::IVec>, Error> {

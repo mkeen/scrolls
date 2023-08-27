@@ -1,3 +1,4 @@
+use std::io::Read;
 use pallas::ledger::traverse::{MultiEraBlock, MultiEraHeader};
 use pallas::network::miniprotocols::chainsync::HeaderContent;
 use pallas::network::miniprotocols::{blockfetch, chainsync, Point};
@@ -103,18 +104,8 @@ impl Worker {
             }
             chainsync::RollbackEffect::OutOfScope => {
                 // todo instead return "None" and just be normal
-                let blocks = self.blocks.enqueue_rollback_batch(point);
+                self.blocks.enqueue_rollback_batch(point);
                 log::warn!("rolling backward from point {:?}", point);
-
-                let mut sent_block = false;
-                for block in blocks {
-                    if block.len() > 0 {
-                        self.output
-                            .send(model::RawBlockPayload::roll_back(block))?;
-
-                        sent_block = true;
-                    }
-                }
 
                 Ok(())
             }
@@ -212,6 +203,26 @@ impl gasket::runtime::Worker for Worker {
 
         // see if we have points that already reached certain depth
         let ready = self.chain_buffer.pop_with_depth(self.min_depth);
+
+
+        let mut blocks_to_roll_back: Vec<Vec<u8>> = Vec::default();
+
+        loop {
+            log::warn!("looping");
+            match self.blocks.rollback_pop() {
+                Ok(block) => match block {
+                    None => break,
+                    Some(block) => {
+                        blocks_to_roll_back.push(block.to_vec());
+                    }
+                },
+                Err(_) => break
+            }
+        }
+
+
+
+
 
         // let rollback_to_point: Option<Point> = match self.chain_buffer.latest() {
         //     None => {
