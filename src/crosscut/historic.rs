@@ -154,6 +154,10 @@ impl BufferBlocks {
         self.queue.clone()
     }
 
+    pub fn rollback_queue_depth(&mut self) -> usize {
+        self.queue.len()
+    }
+
     fn drop_old_block_if_buffer_max(&mut self) -> bool {
         let db = self.get_db_ref();
         let mut dropped = false;

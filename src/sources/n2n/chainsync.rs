@@ -206,23 +206,21 @@ impl gasket::runtime::Worker for Worker {
 
         let mut blocks_to_roll_back: Vec<Vec<u8>> = Vec::default();
 
-        loop {
-            log::warn!("looping");
-            match self.blocks.rollback_pop() {
-                Ok(block) => match block {
-                    None => break,
-                    Some(block) => {
-                        log::warn!("got block from rollback queue");
-                        blocks_to_roll_back.push(block.to_vec());
-                    }
-                },
-                Err(_) => break
+        let mut started_rollback = false;
+
+        match self.blocks.rollback_pop() {
+            Ok(block) => match block {
+                None => (),
+                Some(block) => {
+                    log::warn!("got block from rollback queue");
+                    started_rollback = true;
+                    self.output.send(model::RawBlockPayload::roll_back(block))?
+                }
+            },
+            Err(_) => {
+                ()
             }
         }
-
-
-
-
 
         // let rollback_to_point: Option<Point> = match self.chain_buffer.latest() {
         //     None => {
@@ -277,7 +275,8 @@ impl gasket::runtime::Worker for Worker {
             self.block_count.inc(1);
 
             // evaluate if we should finalize the thread according to config
-            if crosscut::should_finalize(&self.finalize, &point) {
+            let depth = self.blocks.rollback_queue_depth();
+            if crosscut::should_finalize(&self.finalize, &point, depth > 0, started_rollback) {
                 log::warn!("sending done");
 
                 return Ok(gasket::runtime::WorkOutcome::Done);

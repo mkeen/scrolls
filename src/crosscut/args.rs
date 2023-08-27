@@ -151,7 +151,7 @@ impl IntersectConfig {
 /// Optional configuration to stop processing new blocks after processing:
 ///   1. a block with the given hash
 ///   2. the first block on or after a given absolute slot
-///   3. TODO: a total of X blocks 
+///   3. TODO: a total of X blocks
 #[derive(Deserialize, Debug, Clone)]
 pub struct FinalizeConfig {
     until_hash: Option<String>,
@@ -162,6 +162,8 @@ pub struct FinalizeConfig {
 pub fn should_finalize(
     config: &Option<FinalizeConfig>,
     last_point: &Point,
+    remaining_rollback: bool,
+    rollback_was_started: bool,
     // block_count: u64,
 ) -> bool {
     let config = match config {
@@ -174,20 +176,24 @@ pub fn should_finalize(
             return expected == &hex::encode(current);
         }
     }
-    
+
     if let Some(max) = config.max_block_slot {
         if last_point.slot_or_default() >= max {
             return true;
         }
     }
-    
+
     // if let Some(max) = config.max_block_quantity {
     //     if block_count >= max {
     //         return true;
     //     }
     // }
 
-    false
+    if rollback_was_started {
+        return remaining_rollback;
+    } else {
+        return false;
+    }
 }
 
 /// Well-known information about the blockhain network
