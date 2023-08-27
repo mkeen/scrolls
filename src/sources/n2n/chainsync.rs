@@ -105,14 +105,6 @@ impl Worker {
             chainsync::RollbackEffect::OutOfScope => {
                 // todo instead return "None" and just be normal
                 self.blocks.enqueue_rollback_batch(point);
-                if let Some(cbor) =  self.blocks.tip_block() {
-                    if let Ok(block) = MultiEraBlock::decode(&cbor) {
-                        self.chain_buffer.roll_forward(
-                            Point::Specific(block.slot(), block.hash().to_vec())
-                        ); // todo maybe remove this roll forward
-                    }
-                }
-
                 log::warn!("rolling backward from point {:?}", point);
 
                 Ok(())
@@ -222,6 +214,14 @@ impl gasket::runtime::Worker for Worker {
 
         if started_rollback {
             if depth == 0 {
+                if let Some(cbor) =  self.blocks.tip_block() {
+                    if let Ok(block) = MultiEraBlock::decode(&cbor) {
+                        self.chain_buffer.roll_forward(
+                            Point::Specific(block.slot(), block.hash().to_vec())
+                        ); // todo maybe remove this roll forward
+                    }
+                }
+
                 log::warn!("still working on rollback");
                 return Ok(gasket::runtime::WorkOutcome::Done);
             }
