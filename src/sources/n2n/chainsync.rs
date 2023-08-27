@@ -235,7 +235,15 @@ impl gasket::runtime::Worker for Worker {
         };
 
 
-        log::warn!("found {} points with required min depth -- also -- {}, and... {}", ready.len(), self.chain_buffer.latest().unwrap().slot_or_default(), point.unwrap().slot_or_default());
+        match point {
+            None => {}
+            Some(_) => {
+                log::warn!("found {} points with required min depth -- also -- {}, and... {}", ready.len(), self.chain_buffer.latest().unwrap().slot_or_default(), point.unwrap().slot_or_default());
+            }
+        }
+
+
+
 
         // request download of blocks for confirmed points
         for point in ready {
