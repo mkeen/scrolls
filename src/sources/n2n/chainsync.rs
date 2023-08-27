@@ -223,16 +223,11 @@ impl gasket::runtime::Worker for Worker {
             }
         }
 
-        log::warn!("I am now working");
+        let depth = self.blocks.rollback_queue_depth();
 
-        if started_rollback {
-            let depth = self.blocks.rollback_queue_depth();
-            if depth == 0 {
-                log::warn!("sending rollback done");
-
-                return Ok(gasket::runtime::WorkOutcome::Done);
-            }
-
+        if started_rollback && depth > 0 {
+            log::warn!("still working on rollback");
+            return Ok(gasket::runtime::WorkOutcome::Partial);
         } else {
             match self.chainsync.as_ref().unwrap().has_agency() {
                 true => self.request_next()?,
