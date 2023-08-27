@@ -448,9 +448,10 @@ impl gasket::runtime::Worker for Worker {
                                 log::warn!("couldnt find rollback block {}", e);
                             }
                         }
+                    } else {
+                        log::warn!("possibly sending dirty event back enrich data");
                     }
-
-                    log::warn!("possibly sending dirty event back enrich data");
+                    
                     self.output
                         .send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
 
