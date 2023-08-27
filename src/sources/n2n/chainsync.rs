@@ -209,26 +209,20 @@ impl gasket::runtime::Worker for Worker {
 
         let mut started_rollback = false;
 
-        match self.blocks.rollback_pop() {
-            Ok(block) => match block {
-                None => (),
-                Some(block) => {
-                    log::warn!("got block from rollback queue");
-                    started_rollback = true;
-                    self.output.send(model::RawBlockPayload::roll_back(block))?;
-                    self.block_count.inc(1);
-                }
-            },
-            Err(_) => {
-                ()
+        if let Ok(block) = self.blocks.rollback_pop() {
+            if let Some(block) = block {
+                log::warn!("got block from rollback queue");
+                self.output.send(model::RawBlockPayload::roll_back(block))?;
+                self.block_count.inc(1);
             }
+
         }
 
         let depth = self.blocks.rollback_queue_depth();
 
-        if started_rollback && depth > 0 {
+        if started_rollback && depth == 0 {
             log::warn!("still working on rollback");
-            return Ok(gasket::runtime::WorkOutcome::Partial);
+            return Ok(gasket::runtime::WorkOutcome::Done);
         } else {
             match self.chainsync.as_ref().unwrap().has_agency() {
                 true => self.request_next()?,
