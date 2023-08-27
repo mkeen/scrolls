@@ -238,7 +238,7 @@ impl gasket::runtime::Worker for Worker {
         match point {
             None => {}
             Some(_) => {
-                log::warn!("found {} points with required min depth -- also -- {}, and... {}", ready.len(), self.chain_buffer.latest().unwrap().slot_or_default(), point.unwrap().slot_or_default());
+                log::warn!("found {} points with required min depth -- also -- {}", ready.len(), point.unwrap().slot_or_default());
             }
         }
 
