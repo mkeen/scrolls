@@ -157,7 +157,6 @@ impl Worker {
             }
             chainsync::NextResponse::RollBackward(p, t) => {
                 self.on_rollback(&p)?;
-                self.chain_tip.set(t.1 as i64);
                 Ok(())
             }
             _ => unreachable!("protocol invariant not respected in chain-sync state machine"),
