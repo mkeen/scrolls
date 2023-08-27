@@ -106,7 +106,7 @@ impl Worker {
                 let mut sent_block = false;
                 for block in blocks {
                     if block.len() > 0 {
-                        log::warn!("Found block to roll back");
+                        log::warn!("rolling backward to point {:?}", point);
 
                         self.output
                             .send(model::RawBlockPayload::roll_back(block))?;
