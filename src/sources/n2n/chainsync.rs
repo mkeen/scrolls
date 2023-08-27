@@ -107,6 +107,13 @@ impl Worker {
                 self.blocks.enqueue_rollback_batch(point);
                 log::warn!("rolling backward from point {:?}", point);
 
+                if let Some(current_tip_block) = self.blocks.tip_block() {
+                    let block = MultiEraBlock::decode(&current_tip_block).unwrap();
+                    self.chain_buffer.roll_forward(
+                        Point::Specific(block.slot(), block.hash().to_vec())
+                    )
+                }
+                
                 Ok(())
             }
         }
@@ -199,7 +206,7 @@ impl gasket::runtime::Worker for Worker {
     fn work(&mut self) -> gasket::runtime::WorkResult {
         let mut blocks_to_roll_back: Vec<Vec<u8>> = Vec::default();
 
-        let mut started_rollback = false;
+        let mut rolled_back = false;
 
         let mut blocks_to_roll_back: Vec<Vec<u8>> = Vec::default();
 
@@ -209,7 +216,7 @@ impl gasket::runtime::Worker for Worker {
                     None => break,
                     Some(block) => {
                         if block.len() > 0 {
-                            started_rollback = true;
+                            rolled_back = true;
                             self.output.send(model::RawBlockPayload::roll_back(block))?;
                             self.block_count.inc(1);
                         }
@@ -219,6 +226,10 @@ impl gasket::runtime::Worker for Worker {
                 Err(_) => break
             }
 
+        }
+
+        if rolled_back {
+            return Ok(gasket::runtime::WorkOutcome::Done);
         }
 
         match self.chainsync.as_ref().unwrap().has_agency() {
