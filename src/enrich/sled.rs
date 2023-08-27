@@ -445,7 +445,7 @@ impl gasket::runtime::Worker for Worker {
                                 self.clean_consumed_ring();
                             }
                             Err(_) => {
-                                log::warn!("THIS SHOULD NEBVER SHOW UP ANYWHERE")
+                                log::warn!("couldnt find rollback block");
                             }
                         }
                     }

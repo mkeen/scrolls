@@ -103,6 +103,8 @@ impl Worker {
             chainsync::RollbackEffect::OutOfScope => {
                 // todo instead return "None" and just be normal
                 let blocks = self.blocks.enqueue_rollback_batch(point);
+                log::warn!("initiating rollback of {:?} blocks", blocks.len());
+
                 let mut sent_block = false;
                 for block in blocks {
                     if block.len() > 0 {
