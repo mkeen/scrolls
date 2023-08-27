@@ -452,8 +452,13 @@ impl gasket::runtime::Worker for Worker {
                         log::warn!("possibly sending dirty event back enrich data");
                     }
 
-                    self.output
-                        .send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
+                    if !cbor.is_empty() {
+                        self.output
+                            .send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
+                    } else {
+                        return Ok(gasket::runtime::WorkOutcome::Partial)
+                    }
+
 
                     self.blocks_counter.inc(1);
                 }
