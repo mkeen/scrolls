@@ -203,7 +203,7 @@ impl gasket::runtime::Worker for Worker {
             }
 
             // evaluate if we should finalize the thread according to config
-            if crosscut::should_finalize(&self.finalize, &point, false, false) {
+            if crosscut::should_finalize(&self.finalize, &point) {
                 return Ok(gasket::runtime::WorkOutcome::Done);
             }
         }

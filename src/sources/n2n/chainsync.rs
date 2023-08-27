@@ -236,7 +236,7 @@ impl gasket::runtime::Worker for Worker {
 
         if started_rollback {
             let depth = self.blocks.rollback_queue_depth();
-            if crosscut::should_finalize(&self.finalize, &Point::Origin, depth > 0, started_rollback) {
+            if depth == 0 {
                 log::warn!("sending rollback done");
 
                 return Ok(gasket::runtime::WorkOutcome::Done);
@@ -261,8 +261,7 @@ impl gasket::runtime::Worker for Worker {
                 self.block_count.inc(1);
 
                 // evaluate if we should finalize the thread according to config
-                let depth = self.blocks.rollback_queue_depth();
-                if crosscut::should_finalize(&self.finalize, &point, depth > 0, started_rollback) {
+                if crosscut::should_finalize(&self.finalize, &point) {
                     log::warn!("sending done");
 
                     return Ok(gasket::runtime::WorkOutcome::Done);
@@ -271,43 +270,6 @@ impl gasket::runtime::Worker for Worker {
             }
 
         }
-
-        // let rollback_to_point: Option<Point> = match self.chain_buffer.latest() {
-        //     None => {
-        //         match self.blocks.tip_block() {
-        //             None => {None}
-        //             Some(tip_block) => {
-        //                 let block = MultiEraBlock::decode(tip_block.as_slice())
-        //                     .map_err(crate::Error::cbor)
-        //                     .apply_policy(&self.policy)
-        //                     .or_panic()?;
-        //
-        //                 match block {
-        //                     None => None,
-        //                     Some(block) => Some(Point::Specific(block.slot(), block.hash().to_vec()))
-        //                 }
-        //             }
-        //         }
-        //
-        //     },
-        //     Some(_) => None
-        // };
-
-
-        // match rollback_to_point {
-        //     None => {}
-        //     Some(rollback_point) => {
-        //         log::warn!("found {} rollback points points with required min depth -- also -- {}", ready.len(), rollback_point.slot_or_default());
-        //     }
-        // }
-
-
-
-
-
-
-        // request download of blocks for confirmed points
-
 
         log::warn!("I am now saying i am busy");
 

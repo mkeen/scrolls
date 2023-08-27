@@ -162,8 +162,6 @@ pub struct FinalizeConfig {
 pub fn should_finalize(
     config: &Option<FinalizeConfig>,
     last_point: &Point,
-    remaining_rollback: bool,
-    rollback_was_started: bool,
     // block_count: u64,
 ) -> bool {
     let config = match config {
@@ -178,10 +176,6 @@ pub fn should_finalize(
     }
 
     if let Some(max) = config.max_block_slot {
-        if rollback_was_started {
-            return remaining_rollback;
-        }
-
         if last_point.slot_or_default() >= max {
             return true;
         }
