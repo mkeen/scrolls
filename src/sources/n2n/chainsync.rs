@@ -95,6 +95,7 @@ impl Worker {
     }
 
     fn on_rollback(&mut self, point: &Point) -> Result<(), gasket::error::Error> {
+        // TODO SET TIP OR UNDO 141
         match self.chain_buffer.roll_back(point) {
             chainsync::RollbackEffect::Handled => {
                 log::warn!("handled rollback within buffer {:?}", point);
@@ -138,7 +139,6 @@ impl Worker {
             }
             chainsync::NextResponse::RollBackward(p, t) => {
                 self.on_rollback(&p)?;
-                self.chain_tip.set(t.1 as i64);
                 Ok(())
             }
             chainsync::NextResponse::Await => {
@@ -212,7 +212,7 @@ impl gasket::runtime::Worker for Worker {
 
         // see if we have points that already reached certain depth
         let ready = self.chain_buffer.pop_with_depth(self.min_depth);
-        log::debug!("found {} points with required min depth", ready.len());
+        log::warn!("found {} points with required min depth", ready.len());
 
         // request download of blocks for confirmed points
         for point in ready {
