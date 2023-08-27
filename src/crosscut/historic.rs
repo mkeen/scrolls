@@ -35,11 +35,12 @@ pub struct BufferBlocks {
 impl BufferBlocks {
     fn open_db(config: BlockConfig) -> Self {
         let db = sled::open(config.db_path).or_retry().unwrap();
+        let queue: Vec<Vec<u8>> = Vec::default();
 
         BufferBlocks {
             db_depth: Some(db.len() as usize), // o(n) to get the initial size, but should only be called once
             db: Some(db),
-            queue: Vec::default(),
+            queue,
         }
     }
 
@@ -97,10 +98,12 @@ impl BufferBlocks {
     }
 
     pub fn enqueue_rollback_batch(&mut self, from: &Point) {
-        self.queue = self.get_rollback_range(from)
+        self.get_rollback_range(from);
     }
 
     pub fn rollback_pop(&mut self) -> Result<Option<sled::IVec>, Error> {
+
+
         match self.queue.pop() {
             None => Ok(None),
             Some(popped) => {
@@ -117,7 +120,7 @@ impl BufferBlocks {
         self.db.as_ref().unwrap()
     }
 
-    fn get_rollback_range(&self, from: &Point) -> Vec<Vec<u8>> {
+    fn get_rollback_range(&mut self, from: &Point) -> Vec<Vec<u8>> {
         let mut current_block: Vec<u8> = vec![];
         let mut blocks_to_roll_back: Vec<Vec<u8>> = vec![];
 
@@ -149,7 +152,7 @@ impl BufferBlocks {
             self.queue = blocks_to_roll_back;
         }
 
-        blocks_to_roll_back
+        self.queue.clone()
     }
 
     fn drop_old_block_if_buffer_max(&mut self) -> bool {
