@@ -216,8 +216,8 @@ impl gasket::runtime::Worker for Worker {
             if depth == 0 {
                 if let Some(cbor) =  self.blocks.tip_block() {
                     if let Ok(block) = MultiEraBlock::decode(&cbor) {
-                        self.chain_buffer.roll_forward(
-                            Point::Specific(block.slot(), block.hash().to_vec())
+                        //self.chain_buffer.roll_forward(
+                         //   Point::Specific(block.slot(), block.hash().to_vec())
                         ); // todo maybe remove this roll forward
                     }
                 }
