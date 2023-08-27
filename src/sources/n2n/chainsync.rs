@@ -213,7 +213,7 @@ impl gasket::runtime::Worker for Worker {
         // see if we have points that already reached certain depth
         let ready = self.chain_buffer.pop_with_depth(self.min_depth);
 
-        let point: Option<Point> = match self.chain_buffer.latest() {
+        let rollback_to_point: Option<Point> = match self.chain_buffer.latest() {
             None => {
                 match self.blocks.tip_block() {
                     None => {None}
@@ -231,14 +231,14 @@ impl gasket::runtime::Worker for Worker {
                 }
 
             },
-            Some(tip) => Some(tip.clone())
+            Some(_) => None
         };
 
 
-        match point {
+        match rollback_to_point {
             None => {}
-            Some(_) => {
-                log::warn!("found {} points with required min depth -- also -- {}", ready.len(), point.unwrap().slot_or_default());
+            Some(rollback_point) => {
+                log::warn!("found {} rollback points points with required min depth -- also -- {}", ready.len(), rollback_point.slot_or_default());
             }
         }
 
