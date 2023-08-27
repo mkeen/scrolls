@@ -101,13 +101,12 @@ impl BufferBlocks {
         self.get_rollback_range(from);
     }
 
-    pub fn rollback_pop(&mut self) -> Result<Option<sled::IVec>, Error> {
-
-
+    pub fn rollback_pop(&mut self) -> Result<Option<Vec<u8>>, Error> {
         match self.queue.pop() {
             None => Ok(None),
             Some(popped) => {
-                self.get_db_ref().remove(popped).map_err(Error::storage)
+                self.get_db_ref().remove(popped.clone()).map_err(Error::storage);
+                Ok(Some(popped))
             }
         }
     }
