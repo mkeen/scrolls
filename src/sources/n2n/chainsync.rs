@@ -205,15 +205,6 @@ impl gasket::runtime::Worker for Worker {
     }
 
     fn work(&mut self) -> gasket::runtime::WorkResult {
-        match self.chainsync.as_ref().unwrap().has_agency() {
-            true => self.request_next()?,
-            false => self.await_next()?,
-        };
-
-        // see if we have points that already reached certain depth
-        let ready = self.chain_buffer.pop_with_depth(self.min_depth);
-
-
         let mut blocks_to_roll_back: Vec<Vec<u8>> = Vec::default();
 
         let mut started_rollback = false;
@@ -243,6 +234,14 @@ impl gasket::runtime::Worker for Worker {
             }
 
         } else {
+            match self.chainsync.as_ref().unwrap().has_agency() {
+                true => self.request_next()?,
+                false => self.await_next()?,
+            };
+
+            // see if we have points that already reached certain depth
+            let ready = self.chain_buffer.pop_with_depth(self.min_depth);
+
             for point in ready {
                 log::debug!("requesting block fetch for point {:?}", point);
 
