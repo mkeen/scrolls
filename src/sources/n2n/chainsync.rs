@@ -213,36 +213,38 @@ impl gasket::runtime::Worker for Worker {
         // see if we have points that already reached certain depth
         let ready = self.chain_buffer.pop_with_depth(self.min_depth);
 
-        let rollback_to_point: Option<Point> = match self.chain_buffer.latest() {
-            None => {
-                match self.blocks.tip_block() {
-                    None => {None}
-                    Some(tip_block) => {
-                        let block = MultiEraBlock::decode(tip_block.as_slice())
-                            .map_err(crate::Error::cbor)
-                            .apply_policy(&self.policy)
-                            .or_panic()?;
-
-                        match block {
-                            None => None,
-                            Some(block) => Some(Point::Specific(block.slot(), block.hash().to_vec()))
-                        }
-                    }
-                }
-
-            },
-            Some(_) => None
-        };
-
-
-        match rollback_to_point {
-            None => {}
-            Some(rollback_point) => {
-                log::warn!("found {} rollback points points with required min depth -- also -- {}", ready.len(), rollback_point.slot_or_default());
-            }
-        }
+        // let rollback_to_point: Option<Point> = match self.chain_buffer.latest() {
+        //     None => {
+        //         match self.blocks.tip_block() {
+        //             None => {None}
+        //             Some(tip_block) => {
+        //                 let block = MultiEraBlock::decode(tip_block.as_slice())
+        //                     .map_err(crate::Error::cbor)
+        //                     .apply_policy(&self.policy)
+        //                     .or_panic()?;
+        //
+        //                 match block {
+        //                     None => None,
+        //                     Some(block) => Some(Point::Specific(block.slot(), block.hash().to_vec()))
+        //                 }
+        //             }
+        //         }
+        //
+        //     },
+        //     Some(_) => None
+        // };
 
 
+        // match rollback_to_point {
+        //     None => {}
+        //     Some(rollback_point) => {
+        //         log::warn!("found {} rollback points points with required min depth -- also -- {}", ready.len(), rollback_point.slot_or_default());
+        //     }
+        // }
+
+
+
+        log::warn!("I am now working");
 
 
         // request download of blocks for confirmed points
@@ -266,8 +268,11 @@ impl gasket::runtime::Worker for Worker {
             // evaluate if we should finalize the thread according to config
             if crosscut::should_finalize(&self.finalize, &point) {
                 return Ok(gasket::runtime::WorkOutcome::Done);
+                log::warn!("sending done");
             }
         }
+
+        log::warn!("I am now saying i am busy");
 
         Ok(gasket::runtime::WorkOutcome::Partial)
     }
