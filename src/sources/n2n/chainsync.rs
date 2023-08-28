@@ -225,9 +225,9 @@ impl gasket::runtime::Worker for Worker {
 
         if rolled_back {
 
-            log::warn!(self.chain_buffer.latest(), "!!!!");
+            log::warn!(self.chain_buffer.latest().unwrap(), "!!!!");
 
-            return if crosscut::should_finalize(&self.finalize, &point) {
+            return if crosscut::should_finalize(&self.finalize, self.chain_buffer.latest().unwrap()) {
                 log::warn!("sending done");
 
                 Ok(gasket::runtime::WorkOutcome::Done)
