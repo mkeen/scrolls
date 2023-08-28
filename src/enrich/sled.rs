@@ -29,12 +29,12 @@ type OutputPort = gasket::messaging::OutputPort<model::EnrichedBlockPayload>;
 #[derive(Deserialize, Clone)]
 pub struct Config {
     pub db_path: String,
-    pub consumed_ring_path: Option<String>,
+    pub rollback_db_path: Option<String>,
 }
 
 impl Config {
     pub fn boostrapper(mut self, policy: &crosscut::policies::RuntimePolicy, blocks: &crosscut::historic::BlockConfig) -> Bootstrapper {
-        self.consumed_ring_path = Some(blocks.consumed_ring_path.clone());
+        self.rollback_db_path = Some(blocks.consumed_ring_path.clone());
 
         Bootstrapper {
             config: self,
@@ -66,7 +66,7 @@ impl Bootstrapper {
             config: self.config,
             policy: self.policy,
             db: None,
-            consumed_ring: None,
+            rollback_db: None,
             last_db_prune_time: None,
             input: self.input,
             output: self.output,
@@ -92,7 +92,7 @@ pub struct Worker {
     config: Config,
     policy: crosscut::policies::RuntimePolicy,
     db: Option<sled::Db>,
-    consumed_ring: Option<sled::Db>,
+    rollback_db: Option<sled::Db>,
     last_db_prune_time: Option<std::time::Instant>,
     input: InputPort,
     output: OutputPort,
@@ -143,51 +143,6 @@ fn fetch_referenced_utxo<'a>(
     }
 }
 
-#[inline]
-fn prune_tree(db: &sled::Db) {
-    let mut keys_to_drop: Vec<sled::IVec> = vec![];
-    let mut drop_keys_batch = sled::Batch::default();
-
-    let mut count: u64 = 0;
-
-    match db.last() {
-        Ok(last_result) => match last_result {
-            None => {}
-            Some((last_key, _)) => {
-                let mut skipped = 0;
-                let mut last_seen_key = last_key.clone();
-                let mut trim_batch = sled::Batch::default();
-                loop {
-                    match db.get_lt(last_seen_key) {
-                        Ok(new_last_seen) => match new_last_seen {
-                            None => break,
-                            Some((new_last_seen_v, _)) => {
-                                last_seen_key = new_last_seen_v.clone();
-                                if skipped > 1000000 { // Keep 1,000,0 records in the circular buffers
-                                    count += 1;
-                                    trim_batch.remove(new_last_seen_v)
-                                }
-                                skipped += 1;
-                            }
-                        }
-                        Err(_) => break
-                    }
-                }
-
-                if count > 0 {
-                    log::error!("trimming {}", count);
-                } else {
-                    log::error!("no trim needed -- current length {}", db.len());
-                }
-
-                db.apply_batch(trim_batch).expect("panic");
-            }
-        }
-        Err(_) => {}
-    };
-
-}
-
 impl Worker {
     fn db_refs_all(&self) -> Result<Option<(&sled::Db, &sled::Db)>, ()> {
         match (self.db_ref_main(), self.db_ref_consumed_ring()) {
@@ -206,7 +161,7 @@ impl Worker {
     }
 
     fn db_ref_consumed_ring(&self) -> Option<&sled::Db> {
-        match self.consumed_ring.as_ref() {
+        match self.rollback_db.as_ref() {
             None => None,
             Some(db) => Some(db)
         }
@@ -278,7 +233,7 @@ impl Worker {
         Ok(ctx)
     }
 
-    fn get_removed_from_ring(&self, consumed_ring: &sled::Db, key: &[u8]) -> Result<Option<IVec>, crate::Error> {
+    fn get_removed(&self, consumed_ring: &sled::Db, key: &[u8]) -> Result<Option<IVec>, crate::Error> {
         consumed_ring
             .get(key)
             .map_err(crate::Error::storage)
@@ -315,10 +270,6 @@ impl Worker {
         result
     }
 
-    fn update_last_prune_time(&mut self) {
-        self.last_db_prune_time = Some(std::time::Instant::now());
-    }
-
     fn replace_consumed_utxos(&self, db: &sled::Db, consumed_ring: &sled::Db, txs: &[MultiEraTx]) -> Result<(), crate::Error> {
         let mut insert_batch = sled::Batch::default();
         let mut remove_batch = sled::Batch::default();
@@ -330,7 +281,7 @@ impl Worker {
             .collect();
 
         for key in keys.iter().rev() {
-            if let Ok(Some(existing_value)) = self.get_removed_from_ring(consumed_ring, key.to_string().as_bytes()) {
+            if let Ok(Some(existing_value)) = self.get_removed(consumed_ring, key.to_string().as_bytes()) {
                 insert_batch.insert(key.to_string().as_bytes(), existing_value);
                 remove_batch.remove(key.to_string().as_bytes());
             }
@@ -361,11 +312,9 @@ impl gasket::runtime::Worker for Worker {
 
     fn work(&mut self) -> gasket::runtime::WorkResult {
         let msg = self.input.recv_or_idle()?;
-        let mut ctx = BlockContext::default();
         let all_dbs = self.db_refs_all();
         if let Err(_) = all_dbs {
-            log::warn!("skipping inserting utxos, no db yet");
-            return Err(gasket::error::Error::RetryableError("db not connected".into()))
+            return Err(gasket::error::Error::WorkPanic("database error".into()))
         }
 
         let all_dbs = all_dbs.unwrap();
@@ -396,8 +345,6 @@ impl gasket::runtime::Worker for Worker {
 
                 }
                 model::RawBlockPayload::RollBack(cbor) => {
-                    log::warn!("rolling back enrich data");
-
                     let block = MultiEraBlock::decode(&cbor)
                         .map_err(crate::Error::cbor)
                         .apply_policy(&self.policy);
@@ -415,7 +362,8 @@ impl gasket::runtime::Worker for Worker {
                             self.remove_produced_utxos(db, &txs).expect("todo: panic error");
                             self.replace_consumed_utxos(db, consumed_ring, &txs).expect("todo: panic error");
 
-                            ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
+                            let ctx = self.par_fetch_referenced_utxos(db, &txs)
+                                .or_restart()?;
 
                             self.output
                                 .send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
@@ -436,18 +384,17 @@ impl gasket::runtime::Worker for Worker {
 
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
         let db = sled::open(&self.config.db_path).or_retry()?;
-        let consumed_ring = sled::open(self.config.consumed_ring_path.clone().unwrap_or_default()).or_retry()?;
+        let consumed_ring = sled::open(self.config.rollback_db_path.clone().unwrap_or_default()).or_retry()?;
 
         self.last_db_prune_time = Some(std::time::Instant::now());
 
         self.db = Some(db);
-        self.consumed_ring = Some(consumed_ring);
+        self.rollback_db = Some(consumed_ring);
 
         Ok(())
     }
 
     fn teardown(&mut self) -> Result<(), gasket::error::Error> {
-        error!("SHUT ME DOWN CHARLIE");
         Ok(())
     }
 }
