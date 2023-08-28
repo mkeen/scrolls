@@ -140,9 +140,7 @@ pub enum CRDTCommand {
     PNCounter(Key, Delta),
     HashCounter(Key, Member, Delta),
     HashSetValue(Key, Member, Value),
-    HashSetMulti(Key, Vec<Member>, Vec<Value>),
     HashUnsetKey(Key, Member),
-    UnsetKey(Key),
     BlockFinished(Point),
 }
 

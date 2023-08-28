@@ -1,4 +1,3 @@
-use std::io::Read;
 use pallas::ledger::traverse::{MultiEraBlock, MultiEraHeader};
 use pallas::network::miniprotocols::chainsync::{HeaderContent, Tip};
 use pallas::network::miniprotocols::{blockfetch, chainsync, Point};
