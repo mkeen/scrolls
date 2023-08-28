@@ -224,7 +224,17 @@ impl gasket::runtime::Worker for Worker {
         }
 
         if rolled_back {
-            return Ok(gasket::runtime::WorkOutcome::Done);
+
+            log::warn!(self.chain_buffer.latest(), "!!!!");
+
+            return if crosscut::should_finalize(&self.finalize, &point) {
+                log::warn!("sending done");
+
+                Ok(gasket::runtime::WorkOutcome::Done)
+            } else {
+                Ok(gasket::runtime::WorkOutcome::Partial)
+            }
+
         }
 
         match self.chainsync.as_ref().unwrap().has_agency() {
@@ -254,8 +264,6 @@ impl gasket::runtime::Worker for Worker {
             // evaluate if we should finalize the thread according to config
 
             if crosscut::should_finalize(&self.finalize, &point) {
-                log::warn!("sending done");
-
                 return Ok(gasket::runtime::WorkOutcome::Done);
             }
 
