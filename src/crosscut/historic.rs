@@ -146,7 +146,7 @@ impl BufferBlocks {
         }
 
         db.apply_batch(clear_blocks).map_err(crate::Error::storage).expect("todo: map storage error");
-        
+
         if blocks_to_roll_back.len() > 0 {
             self.queue = blocks_to_roll_back;
         }
