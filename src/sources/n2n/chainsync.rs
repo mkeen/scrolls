@@ -201,7 +201,6 @@ impl gasket::runtime::Worker for Worker {
         let mut blocks_to_roll_back: Vec<Vec<u8>> = Vec::default();
 
         loop {
-            log::warn!("looping");
             if let Ok(pop_rollback_block) = self.blocks.rollback_pop() {
                 if let Some(cbor) = pop_rollback_block {
                     if !cbor.is_empty() {
