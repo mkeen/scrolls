@@ -132,7 +132,9 @@ impl BufferBlocks {
             Some(value) => value.to_vec()
         };
 
-        blocks_to_roll_back.push(current_block.to_vec());
+        if !current_block.is_empty() {
+            blocks_to_roll_back.push(current_block.to_vec());
+        }
 
         let mut clear_blocks = sled::Batch::default();
 
