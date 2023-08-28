@@ -96,13 +96,13 @@ impl Worker {
     }
 
     fn on_rollback(&mut self, point: &Point, tip: &Tip) -> Result<(), gasket::error::Error> {
-        // TODO SET TIP OR UNDO 141
         match self.chain_buffer.roll_back(point) {
             chainsync::RollbackEffect::Handled => {
                 log::warn!("handled rollback within buffer {:?}", point);
                 Ok(())
             }
             chainsync::RollbackEffect::OutOfScope => {
+                log::warn!("rolling backward to point {:?}", point);
                 self.blocks.enqueue_rollback_batch(point);
                 Ok(())
             }
@@ -126,7 +126,7 @@ impl Worker {
                 Ok(())
             }
             chainsync::NextResponse::RollBackward(p, t) => {
-                self.chain_buffer.roll_back(&p);
+                self.chain_buffer.roll_back(&p); // just rollback the chain buffer... dont do anything with rollback data on initial sync
                 self.chain_tip.set(t.1 as i64);
                 Ok(())
             }
