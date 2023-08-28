@@ -65,9 +65,8 @@ impl Bootstrapper {
         let worker = Worker {
             config: self.config,
             policy: self.policy,
-            db: None,
+            enrich_db: None,
             rollback_db: None,
-            last_db_prune_time: None,
             input: self.input,
             output: self.output,
             inserts_counter: Default::default(),
@@ -91,9 +90,8 @@ impl Bootstrapper {
 pub struct Worker {
     config: Config,
     policy: crosscut::policies::RuntimePolicy,
-    db: Option<sled::Db>,
+    enrich_db: Option<sled::Db>,
     rollback_db: Option<sled::Db>,
-    last_db_prune_time: Option<std::time::Instant>,
     input: InputPort,
     output: OutputPort,
     inserts_counter: gasket::metrics::Counter,
@@ -145,7 +143,7 @@ fn fetch_referenced_utxo<'a>(
 
 impl Worker {
     fn db_refs_all(&self) -> Result<Option<(&sled::Db, &sled::Db)>, ()> {
-        match (self.db_ref_main(), self.db_ref_consumed_ring()) {
+        match (self.db_ref_enrich(), self.db_ref_rollback()) {
             (Some(db), Some(consumed_ring)) => {
                 Ok(Some((db, consumed_ring)))
             },
@@ -153,14 +151,14 @@ impl Worker {
         }
     }
 
-    fn db_ref_main(&self) -> Option<&sled::Db> {
-        match self.db.as_ref() {
+    fn db_ref_enrich(&self) -> Option<&sled::Db> {
+        match self.enrich_db.as_ref() {
             None => None,
             Some(db) => Some(db)
         }
     }
 
-    fn db_ref_consumed_ring(&self) -> Option<&sled::Db> {
+    fn db_ref_rollback(&self) -> Option<&sled::Db> {
         match self.rollback_db.as_ref() {
             None => None,
             Some(db) => Some(db)
@@ -383,14 +381,14 @@ impl gasket::runtime::Worker for Worker {
     }
 
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
-        let db = sled::open(&self.config.db_path).or_retry()?;
-        let consumed_ring = sled::open(self.config.rollback_db_path.clone().unwrap_or_default()).or_retry()?;
+        log::warn!("opening enrich databases");
+        let enrich_db = sled::open(&self.config.db_path).or_retry()?;
+        let rollback_db = sled::open(self.config.rollback_db_path.clone().unwrap_or_default()).or_retry()?;
 
-        self.last_db_prune_time = Some(std::time::Instant::now());
+        self.enrich_db = Some(enrich_db);
+        self.rollback_db = Some(rollback_db);
 
-        self.db = Some(db);
-        self.rollback_db = Some(consumed_ring);
-
+        log::warn!("finished opening enrich databases");
         Ok(())
     }
 
