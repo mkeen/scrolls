@@ -213,12 +213,12 @@ impl gasket::runtime::Worker for Worker {
                         self.block_count.inc(1);
 
                         if let Some(block) = block {
-                            if crosscut::should_finalize(&self.finalize, &Point::Specific(block.slot(), block.hash().to_vec())) {
+                            let last_point = Point::Specific(block.slot(), block.hash().to_vec());
+
+                            if crosscut::should_finalize(&self.finalize, &last_point) {
                                 return Ok(gasket::runtime::WorkOutcome::Done);
                             }
-
                         }
-
                     }
                 } else {
                     break;
