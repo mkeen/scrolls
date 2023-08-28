@@ -1,124 +1,80 @@
-use pallas::ledger::traverse::MultiEraBlock;
+use pallas::ledger::traverse::MultiEraOutput;
+use pallas::ledger::traverse::{MultiEraBlock, MultiEraTx, OutputRef};
 use serde::Deserialize;
 
-use crate::crosscut::epochs::block_epoch;
-use crate::model::Value;
-use crate::{crosscut, model};
+use crate::{crosscut, model, prelude::*};
 
 #[derive(Deserialize)]
 pub struct Config {
     pub key_prefix: Option<String>,
+    pub filter: Option<Vec<String>>,
 }
 
 pub struct Reducer {
     config: Config,
-    chain: crosscut::ChainWellKnownInfo,
+    policy: crosscut::policies::RuntimePolicy,
 }
 
 impl Reducer {
-
-    pub fn current_epoch(
+    fn process_consumed_txo(
         &mut self,
-        block: &MultiEraBlock,
-        key: &str,
+        ctx: &model::BlockContext,
+        input: &OutputRef,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        let epoch_no = block_epoch(&self.chain, block);
+        let utxo = ctx.find_utxo(input).apply_policy(&self.policy).or_panic()?;
 
-        let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "epoch_no"), Value::BigInt(epoch_no as i128));
+        let utxo = match utxo {
+            Some(x) => x,
+            None => return Ok(())
+        };
 
-        output.send(gasket::messaging::Message::from(crdt))?;
+        let address = utxo.address().map(|x| x.to_string()).or_panic()?;
 
-        Result::Ok(())
-    }
-
-    pub fn current_height(
-        &mut self,
-        block: &MultiEraBlock,
-        key: &str,
-        output: &mut super::OutputPort,
-    ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "height"), Value::BigInt(block.number() as i128));
-
-        output.send(gasket::messaging::Message::from(crdt))?;
-
-        Result::Ok(())
-    }
-
-    pub fn current_slot(
-        &mut self,
-        block: &MultiEraBlock,
-        key: &str,
-        output: &mut super::OutputPort,
-    ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "slot_no"), Value::BigInt(block.slot() as i128));
-
-        output.send(gasket::messaging::Message::from(crdt))?;
-
-        Result::Ok(())
-    }
-
-    pub fn current_block_hash(
-        &mut self,
-        block: &MultiEraBlock,
-        key: &str,
-        output: &mut super::OutputPort,
-    ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "block_hash"), Value::String(block.hash().to_string()));
-
-        output.send(gasket::messaging::Message::from(crdt))?;
-
-        Result::Ok(())
-    }
-
-    pub fn current_block_era(
-        &mut self,
-        block: &MultiEraBlock,
-        key: &str,
-        output: &mut super::OutputPort,
-    ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "block_era"), Value::String(block.era().to_string()));
-
-        output.send(gasket::messaging::Message::from(crdt))?;
-
-        Result::Ok(())
-    }
-
-    pub fn current_block_last_tx_hash(
-        &mut self,
-        block: &MultiEraBlock,
-        key: &str,
-        output: &mut super::OutputPort,
-    ) -> Result<(), gasket::error::Error> {
-        if !block.is_empty() {
-            let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "first_transaction_hash"), Value::String(block.txs().first().unwrap().hash().to_string()));
-
-            output.send(gasket::messaging::Message::from(crdt))?;
-
-            let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "last_transaction_hash"), Value::String(block.txs().last().unwrap().hash().to_string()));
-
-            output.send(gasket::messaging::Message::from(crdt))?;
+        if let Some(addresses) = &self.config.filter {
+            if let Err(_) = addresses.binary_search(&address) {
+                return Ok(());
+            }
         }
 
-        Result::Ok(())
+        let crdt = model::CRDTCommand::set_remove(
+            self.config.key_prefix.as_deref(),
+            &address,
+            input.to_string(),
+        );
+
+        output.send(crdt.into())
     }
 
-    pub fn current_block_last_tx_count(
+    fn process_produced_txo(
         &mut self,
-        block: &MultiEraBlock,
-        key: &str,
+        tx: &MultiEraTx,
+        tx_output: &MultiEraOutput,
+        output_idx: usize,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
-        let crdt = model::CRDTCommand::AnyWriteWins(format!("{}.{}", key, "transactions_count"), Value::BigInt(block.tx_count() as i128));
+        let tx_hash = tx.hash();
+        let address = tx_output.address().map(|addr| addr.to_string()).or_panic()?;
 
-        output.send(gasket::messaging::Message::from(crdt))?;
+        if let Some(addresses) = &self.config.filter {
+            if let Err(_) = addresses.binary_search(&address) {
+                return Ok(());
+            }
+        }
 
-        Result::Ok(())
+        let crdt = model::CRDTCommand::set_add(
+            self.config.key_prefix.as_deref(),
+            &address,
+            format!("{}#{}", tx_hash, output_idx),
+        );
+
+        output.send(crdt.into())
     }
 
     pub fn reduce_block<'b>(
         &mut self,
         block: &'b MultiEraBlock<'b>,
+        ctx: &model::BlockContext,
         rollback: bool,
         output: &mut super::OutputPort,
     ) -> Result<(), gasket::error::Error> {
@@ -126,34 +82,27 @@ impl Reducer {
             return Ok(());
         }
 
-        let def_key_prefix = "last_block";
+        for tx in block.txs().into_iter() {
+            for consumed in tx.consumes().iter().map(|i| i.output_ref()) {
+                self.process_consumed_txo(&ctx, &consumed, output)?;
+            }
 
-        let key = match &self.config.key_prefix {
-            Some(prefix) => format!("{}", prefix),
-            None => format!("{}", def_key_prefix.to_string()),
-        };
-
-        self.current_epoch(block, &key, output)?;
-        self.current_height(block, &key, output)?;
-        self.current_slot(block, &key, output)?;
-        self.current_block_hash(block, &key, output)?;
-        self.current_block_era(block, &key, output)?;
-        self.current_block_last_tx_hash(block, &key, output)?;
-        self.current_block_last_tx_count(block, &key, output)?;
+            for (idx, produced) in tx.produces() {
+                self.process_produced_txo(&tx, &produced, idx, output)?;
+            }
+        }
 
         Ok(())
     }
 }
 
 impl Config {
-    pub fn plugin(self,
-                  chain: &crosscut::ChainWellKnownInfo
-    ) -> super::Reducer {
+    pub fn plugin(self, policy: &crosscut::policies::RuntimePolicy) -> super::Reducer {
         let reducer = Reducer {
             config: self,
-            chain: chain.clone(),
+            policy: policy.clone(),
         };
 
-        super::Reducer::LastBlockParameters(reducer)
+        super::Reducer::UtxoByAddress(reducer)
     }
 }
