@@ -64,6 +64,8 @@ impl Worker {
             self.ops_count.inc(1);
         }
 
+        log::warn!("block finished");
+
         self.output.send(gasket::messaging::Message::from(
             model::CRDTCommand::block_finished(&block),
         ))?;
