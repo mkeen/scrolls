@@ -245,15 +245,6 @@ impl CRDTCommand {
         CRDTCommand::HashSetValue(key, member, value.into())
     }
 
-    pub fn unset_key(prefix: Option<&str>, key: String) -> CRDTCommand {
-        let key = match prefix {
-            Some(prefix) => format!("{}.{}", prefix, key.to_string()),
-            None => key.to_string(),
-        };
-
-        CRDTCommand::UnsetKey(key)
-    }
-
     pub fn hash_del_key(prefix: Option<&str>, key: &str, member: String) -> CRDTCommand {
         let key = match prefix {
             Some(prefix) => format!("{}.{}", prefix, key.to_string()),
