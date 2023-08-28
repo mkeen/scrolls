@@ -223,6 +223,10 @@ impl gasket::runtime::Worker for Worker {
             }
         }
 
+        if rolled_back {
+            return Ok(gasket::runtime::WorkOutcome::Done);
+        }
+
         match self.chainsync.as_ref().unwrap().has_agency() {
             true => self.request_next()?,
             false => self.await_next()?,
@@ -257,10 +261,6 @@ impl gasket::runtime::Worker for Worker {
 
         }
 
-        if rolled_back {
-            return Ok(gasket::runtime::WorkOutcome::Done);
-        } else {
-            Ok(gasket::runtime::WorkOutcome::Partial)
-        }
+        Ok(gasket::runtime::WorkOutcome::Partial)
     }
 }

@@ -73,7 +73,6 @@ impl gasket::runtime::Worker for Worker {
                 ))?;
             }
             model::RawBlockPayload::RollBack(cbor) => {
-                log::warn!("not enriching rollback {}", cbor.len());
                 self.output
                     .send(model::EnrichedBlockPayload::roll_back(
                         cbor,
