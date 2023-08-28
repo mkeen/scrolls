@@ -1,6 +1,6 @@
 use std::io::Read;
 use pallas::ledger::traverse::{MultiEraBlock, MultiEraHeader};
-use pallas::network::miniprotocols::chainsync::HeaderContent;
+use pallas::network::miniprotocols::chainsync::{HeaderContent, Tip};
 use pallas::network::miniprotocols::{blockfetch, chainsync, Point};
 
 use gasket::error::AsWorkError;
@@ -95,7 +95,7 @@ impl Worker {
         Ok(())
     }
 
-    fn on_rollback(&mut self, point: &Point) -> Result<(), gasket::error::Error> {
+    fn on_rollback(&mut self, point: &Point, tip: &Tip) -> Result<(), gasket::error::Error> {
         // TODO SET TIP OR UNDO 141
         match self.chain_buffer.roll_back(point) {
             chainsync::RollbackEffect::Handled => {
@@ -103,11 +103,7 @@ impl Worker {
                 Ok(())
             }
             chainsync::RollbackEffect::OutOfScope => {
-                if let Some(current_tip_block) = self.blocks.tip_block() {
-                    if let Ok(block) = MultiEraBlock::decode(&current_tip_block) {
-                        self.blocks.enqueue_rollback_batch(point);
-                    }
-                }
+                self.blocks.enqueue_rollback_batch(point);
                 Ok(())
             }
         }
@@ -130,8 +126,7 @@ impl Worker {
                 Ok(())
             }
             chainsync::NextResponse::RollBackward(p, t) => {
-                self.on_rollback(&p)?;
-                log::warn!("setting tip {}", t.0.slot_or_default());
+                //self.on_rollback(&p)?; // todo research more... but not doing rollback on initial block request... only subscription
                 self.chain_tip.set(t.1 as i64);
                 Ok(())
             }
@@ -159,7 +154,7 @@ impl Worker {
                 Ok(())
             }
             chainsync::NextResponse::RollBackward(p, t) => {
-                self.on_rollback(&p)?;
+                self.on_rollback(&p, &t)?;
                 self.chain_tip.set(t.1 as i64);
                 Ok(())
             }
