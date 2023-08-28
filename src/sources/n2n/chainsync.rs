@@ -191,11 +191,7 @@ impl gasket::runtime::Worker for Worker {
     }
 
     fn work(&mut self) -> gasket::runtime::WorkResult {
-        let mut blocks_to_roll_back: Vec<Vec<u8>> = Vec::default();
-
         let mut rolled_back = false;
-
-        let mut blocks_to_roll_back: Vec<Vec<u8>> = Vec::default();
 
         loop {
             match self.blocks.rollback_pop() {
