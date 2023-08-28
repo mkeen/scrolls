@@ -34,8 +34,11 @@ pub struct BufferBlocks {
 
 impl BufferBlocks {
     fn open_db(config: BlockConfig) -> Self {
+        log::warn!("opening scrolls block buffer from disk");
         let db = sled::open(config.db_path).or_retry().unwrap();
         let queue: Vec<Vec<u8>> = Vec::default();
+
+        log::warn!("finished opening scrolls block buffer from disk");
 
         BufferBlocks {
             db_depth: Some(db.len() as usize), // o(n) to get the initial size, but should only be called once
