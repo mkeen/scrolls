@@ -219,6 +219,8 @@ impl gasket::runtime::Worker for Worker {
                                 return Ok(gasket::runtime::WorkOutcome::Done);
                             }
                         }
+                    } else {
+                        log::warn!("cant find block")
                     }
                 } else {
                     break;
