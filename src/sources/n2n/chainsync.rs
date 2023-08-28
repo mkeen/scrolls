@@ -126,7 +126,7 @@ impl Worker {
                 Ok(())
             }
             chainsync::NextResponse::RollBackward(p, t) => {
-                //self.on_rollback(&p)?; // todo research more... but not doing rollback on initial block request... only subscription
+                self.chain_buffer.roll_back(&p);
                 self.chain_tip.set(t.1 as i64);
                 Ok(())
             }
