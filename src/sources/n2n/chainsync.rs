@@ -211,11 +211,22 @@ impl gasket::runtime::Worker for Worker {
         loop {
             log::warn!("looping");
             if let Ok(pop_rollback_block) = self.blocks.rollback_pop() {
-                if let Some(block) = pop_rollback_block {
-                    if !block.is_empty() {
-                        rolled_back = true;
-                        self.output.send(model::RawBlockPayload::roll_back(block))?;
-                        self.block_count.inc(1);
+                if let Some(cbor) = pop_rollback_block {
+                    if !cbor.is_empty() {
+                        if let Ok(block) = MultiEraBlock::decode(&cbor) {
+                            rolled_back = true;
+                            self.output.send(model::RawBlockPayload::roll_back(cbor.clone()))?;
+                            self.block_count.inc(1);
+
+                            if crosscut::should_finalize(&self.finalize, &Point::Specific(block.slot(), block.hash().to_vec())) {
+                                log::warn!("sending done");
+
+                                return Ok(gasket::runtime::WorkOutcome::Done);
+                            }
+
+                        }
+
+
                     }
                 } else {
                     break;
@@ -224,17 +235,7 @@ impl gasket::runtime::Worker for Worker {
         }
 
         if rolled_back {
-
-            log::warn!("{}", self.chain_buffer.size().to_string());
-
-            return if crosscut::should_finalize(&self.finalize, self.chain_buffer.latest().unwrap()) {
-                log::warn!("sending done");
-
-                Ok(gasket::runtime::WorkOutcome::Done)
-            } else {
-                Ok(gasket::runtime::WorkOutcome::Partial)
-            }
-
+            return Ok(gasket::runtime::WorkOutcome::Partial)
         }
 
         match self.chainsync.as_ref().unwrap().has_agency() {
