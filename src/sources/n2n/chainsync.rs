@@ -106,7 +106,6 @@ impl Worker {
                 if let Some(current_tip_block) = self.blocks.tip_block() {
                     if let Ok(block) = MultiEraBlock::decode(&current_tip_block) {
                         self.blocks.enqueue_rollback_batch(point);
-                        self.chain_tip.set(Point::Specific(block.slot(), block.hash().to_vec()) as i64);
                     }
                 }
                 Ok(())
