@@ -12,10 +12,8 @@ enum Scrolls {
     Daemon(daemon::Args),
 }
 
-
 fn main() {
     let args = Scrolls::parse();
-    let token_daemon = token.clone();
 
     let result = match args {
         Scrolls::Daemon(x) => daemon::run(&x),

@@ -1,12 +1,11 @@
 use std::time::Duration;
-use futures::{join, TryFutureExt};
 
 use gasket::{
     error::AsWorkError,
     runtime::{spawn_stage, WorkOutcome},
 };
-use gasket::error::Error;
-use log::{error, log, warn};
+
+use log::{log, warn};
 
 use pallas::{
     codec::minicbor,
@@ -14,8 +13,7 @@ use pallas::{
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
-use sled::{Db, IVec};
-use tokio::time::Instant;
+use sled::{IVec};
 
 use crate::{
     bootstrap, crosscut,

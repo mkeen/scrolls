@@ -42,12 +42,6 @@ pub mod tx_count_by_native_token_policy_id;
 pub mod utxo_by_stake;
 #[cfg(feature = "unstable")]
 pub mod utxos_by_asset;
-#[cfg(feature = "unstable")]
-pub mod asset_metadata;
-#[cfg(feature = "unstable")]
-pub mod policy_assets_moved;
-#[cfg(feature = "unstable")]
-pub mod multi_asset_balances;
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
@@ -83,12 +77,6 @@ pub enum Config {
     SupplyByAsset(supply_by_asset::Config),
     #[cfg(feature = "unstable")]
     AddressesByStake(addresses_by_stake::Config),
-    #[cfg(feature = "unstable")]
-    AssetMetadata(asset_metadata::Config),
-    #[cfg(feature = "unstable")]
-    PolicyAssetsMoved(policy_assets_moved::Config),
-    #[cfg(feature = "unstable")]
-    MultiAssetBalances(multi_asset_balances::Config),
 }
 
 impl Config {
@@ -129,12 +117,6 @@ impl Config {
             Config::SupplyByAsset(c) => c.plugin(policy),
             #[cfg(feature = "unstable")]
             Config::AddressesByStake(c) => c.plugin(policy),
-            #[cfg(feature = "unstable")]
-            Config::AssetMetadata(c) => c.plugin(chain, policy),
-            #[cfg(feature = "unstable")]
-            Config::PolicyAssetsMoved(c) => c.plugin(chain, policy),
-            #[cfg(feature = "unstable")]
-            Config::MultiAssetBalances(c) => c.plugin(chain, policy),
         }
     }
 }
@@ -216,12 +198,6 @@ pub enum Reducer {
     SupplyByAsset(supply_by_asset::Reducer),
     #[cfg(feature = "unstable")]
     AddressesByStake(addresses_by_stake::Reducer),
-    #[cfg(feature = "unstable")]
-    AssetMetadata(asset_metadata::Reducer),
-    #[cfg(feature = "unstable")]
-    PolicyAssetsMoved(policy_assets_moved::Reducer),
-    #[cfg(feature = "unstable")]
-    MultiAssetBalances(multi_asset_balances::Reducer),
 }
 
 impl Reducer {
@@ -264,12 +240,6 @@ impl Reducer {
             Reducer::SupplyByAsset(x) => x.reduce_block(block, ctx, rollback, output),
             #[cfg(feature = "unstable")]
             Reducer::AddressesByStake(x) => x.reduce_block(block, ctx, rollback, output),
-            #[cfg(feature = "unstable")]
-            Reducer::AssetMetadata(x) => x.reduce_block(block, rollback, output),
-            #[cfg(feature = "unstable")]
-            Reducer::PolicyAssetsMoved(x) => x.reduce_block(block, output),
-            #[cfg(feature = "unstable")]
-            Reducer::MultiAssetBalances(x) => x.reduce_block(block, ctx, rollback, output),
         }
     }
 }

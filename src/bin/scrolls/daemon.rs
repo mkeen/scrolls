@@ -84,12 +84,6 @@ fn should_stop(pipeline: &bootstrap::Pipeline) -> bool {
 
 fn shutdown(pipeline: bootstrap::Pipeline) {
     for tether in pipeline.tethers {
-        // for tether in pipeline.tethers {
-        //     if tether.name() == "n2n" {
-        //         tether.join_stage();
-        //     }
-        // }
-
         let state = tether.check_state();
         log::warn!("dismissing stage: {} with state {:?}", tether.name(), state);
         tether.dismiss_stage().expect("stage stops");
@@ -106,7 +100,6 @@ fn shutdown(pipeline: bootstrap::Pipeline) {
 }
 
 pub fn run(args: &Args) -> Result<(), scrolls::Error> {
-
     console::initialize(&args.console);
 
     let config = ConfigRoot::new(&args.config)
@@ -130,8 +123,6 @@ pub fn run(args: &Args) -> Result<(), scrolls::Error> {
     let pipeline = bootstrap::build(source, enrich, reducer, storage)?;
 
     log::info!("scrolls is running...");
-
-    let mut started_cancel = false;
 
     while !should_stop(&pipeline) {
         console::refresh(&args.console, &pipeline);
