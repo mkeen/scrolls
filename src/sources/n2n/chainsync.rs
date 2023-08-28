@@ -218,10 +218,9 @@ impl gasket::runtime::Worker for Worker {
                         self.block_count.inc(1);
                     }
                 } else {
+                    log::warn!("ending it here");
                     break
                 }
-            } else {
-                break
             }
         }
 
