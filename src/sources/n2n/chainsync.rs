@@ -209,21 +209,18 @@ impl gasket::runtime::Worker for Worker {
         let mut blocks_to_roll_back: Vec<Vec<u8>> = Vec::default();
 
         loop {
-            match self.blocks.rollback_pop() {
-                Ok(pop_rollback_block) => match pop_rollback_block {
-                    None => break,
-                    Some(block) => {
-                        if block.len() > 0 {
-                            rolled_back = true;
-                            self.output.send(model::RawBlockPayload::roll_back(block))?;
-                            self.block_count.inc(1);
-                        }
-
+            log::warn!("looping");
+            if let Ok(pop_rollback_block) = self.blocks.rollback_pop() {
+                if let Some(block) = pop_rollback_block {
+                    if !block.is_empty() {
+                        rolled_back = true;
+                        self.output.send(model::RawBlockPayload::roll_back(block))?;
+                        self.block_count.inc(1);
                     }
                 }
-                Err(_) => break
+            } else {
+                break
             }
-
         }
 
         if rolled_back {

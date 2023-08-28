@@ -64,8 +64,6 @@ impl Worker {
             self.ops_count.inc(1);
         }
 
-        log::warn!("block finished");
-
         self.output.send(gasket::messaging::Message::from(
             model::CRDTCommand::block_finished(&block),
         ))?;
@@ -92,7 +90,6 @@ impl gasket::runtime::Worker for Worker {
                 self.reduce_block(&block, false, &ctx)?
             }
             model::EnrichedBlockPayload::RollBack(block, ctx) => {
-                log::warn!("calling reducers for enriched rollback block");
                 self.reduce_block(&block, true, &ctx)?
             }
         }
