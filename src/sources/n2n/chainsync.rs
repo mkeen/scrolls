@@ -219,7 +219,7 @@ impl gasket::runtime::Worker for Worker {
                     }
                 } else {
                     log::warn!("ending it here");
-                    break
+                    break;
                 }
             }
         }
