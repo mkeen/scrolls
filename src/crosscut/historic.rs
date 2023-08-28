@@ -69,34 +69,6 @@ impl BufferBlocks {
         self.get_db_ref().flush().unwrap_or_default();
     }
 
-    pub fn last_from(&self, key: &[u8]) -> Option<Vec<u8>> {
-        match self.get_db_ref().get_lt(key) {
-            Ok(result) => {
-                match result {
-                    Some((_, block)) => {
-                        Some(block.to_vec())
-                    },
-                    None => None
-                }
-            }
-            Err(_) => None
-        }
-    }
-
-    pub fn tip_block(&self) -> Option<Vec<u8>> {
-        match self.get_db_ref().last() {
-            Ok(result) => {
-                match result {
-                    Some((_, block)) => {
-                        Some(block.to_vec())
-                    },
-                    None => None
-                }
-            }
-            Err(_) => None
-        }
-    }
-
     pub fn enqueue_rollback_batch(&mut self, from: &Point) -> usize {
         self.get_rollback_range(from).len()
     }
@@ -109,10 +81,6 @@ impl BufferBlocks {
                 Ok(Some(popped))
             }
         }
-    }
-
-    pub fn rollback_queue_len(&mut self) -> usize {
-        self.queue.len()
     }
 
     fn get_db_ref(&self) -> &sled::Db {
@@ -154,10 +122,6 @@ impl BufferBlocks {
         self.queue.clone()
     }
 
-    pub fn rollback_queue_depth(&mut self) -> usize {
-        self.queue.len()
-    }
-
     fn drop_old_block_if_buffer_max(&mut self) -> bool {
         let db = self.get_db_ref();
         let mut dropped = false;
@@ -178,19 +142,23 @@ impl BufferBlocks {
     }
 
     fn db_depth_down(&mut self) -> usize {
-        let mut current_db_depth = self.db_depth.unwrap();
+        let current_db_depth = self.db_depth.unwrap();
         if current_db_depth > 0 {
             return current_db_depth - 1;
         }
+
+        self.db_depth = Some(current_db_depth);
 
         return current_db_depth;
     }
 
     fn db_depth_up(&mut self) -> usize {
-        let mut current_db_depth = self.db_depth.unwrap();
+        let current_db_depth = self.db_depth.unwrap();
         if current_db_depth > 0 {
             return current_db_depth + 1;
         }
+
+        self.db_depth = Some(current_db_depth);
 
         return current_db_depth;
     }
