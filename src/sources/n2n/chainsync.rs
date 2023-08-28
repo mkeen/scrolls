@@ -231,8 +231,6 @@ impl gasket::runtime::Worker for Worker {
         let ready = self.chain_buffer.pop_with_depth(self.min_depth);
 
         for point in ready {
-            log::debug!("requesting block fetch for point {:?}", point);
-
             let block = self
                 .blockfetch
                 .as_mut()
