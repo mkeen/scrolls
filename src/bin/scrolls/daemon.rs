@@ -138,7 +138,7 @@ pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::E
 
     let enrich = config.enrich.unwrap_or_default().bootstrapper(&policy, &block_config);
 
-    let reducer = reducers::Bootstrapper::new(config.reducers, &chain, &policy, &blocks);
+    let reducer = reducers::Bootstrapper::new(config.reducers, &chain, &policy);
 
     let storage = config.storage.plugin(&chain, &config.intersect, &policy);
 
