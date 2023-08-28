@@ -203,18 +203,14 @@ impl gasket::runtime::Worker for Worker {
         loop {
             if let Ok(pop_rollback_block) = self.blocks.rollback_pop() {
                 if let Some(cbor) = pop_rollback_block {
-                    if !cbor.is_empty() {
-                        if let Ok(block) = MultiEraBlock::decode(&cbor) {
-                            rolled_back = true;
-                            self.output.send(model::RawBlockPayload::roll_back(cbor.clone()))?;
-                            self.block_count.inc(1);
+                    if let Ok(block) = MultiEraBlock::decode(&cbor) {
+                        rolled_back = true;
+                        self.output.send(model::RawBlockPayload::roll_back(cbor.clone()))?;
+                        self.block_count.inc(1);
 
-                            if crosscut::should_finalize(&self.finalize, &Point::Specific(block.slot(), block.hash().to_vec())) {
-                                return Ok(gasket::runtime::WorkOutcome::Done);
-                            }
+                        if crosscut::should_finalize(&self.finalize, &Point::Specific(block.slot(), block.hash().to_vec())) {
+                            return Ok(gasket::runtime::WorkOutcome::Done);
                         }
-                    } else {
-                        log::warn!("cant find block")
                     }
                 } else {
                     break;
