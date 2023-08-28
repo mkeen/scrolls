@@ -218,14 +218,9 @@ impl gasket::runtime::Worker for Worker {
                         self.block_count.inc(1);
                     }
                 } else {
-                    log::warn!("ending it here");
                     break;
                 }
             }
-        }
-
-        if rolled_back {
-            return Ok(gasket::runtime::WorkOutcome::Done);
         }
 
         match self.chainsync.as_ref().unwrap().has_agency() {
@@ -262,6 +257,10 @@ impl gasket::runtime::Worker for Worker {
 
         }
 
-        Ok(gasket::runtime::WorkOutcome::Partial)
+        if rolled_back {
+            return Ok(gasket::runtime::WorkOutcome::Done);
+        } else {
+            Ok(gasket::runtime::WorkOutcome::Partial)
+        }
     }
 }
