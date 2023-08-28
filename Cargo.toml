@@ -17,7 +17,6 @@ pallas = "0.17.0"
 # pallas = { git = "https://github.com/txpipe/pallas.git" }
 hex = "0.4.3"
 net2 = "0.2.37"
-blake2 = "0.10.6"
 bech32 = "0.8.1"
 clap = { version = "3.2.6", features = ["derive"] }
 log = "0.4.14"
@@ -41,8 +40,7 @@ rayon = "1.5.3"
 
 # async feature
 futures = { version = "0.3.24", optional = true }
-tokio = { version = "1.21.1", features = ["full"], optional = true }
-tokio-util = "0.7.8"
+tokio = { version = "1.21.1", features = ["rt-multi-thread"], optional = true }
 
 # elastic feature
 elasticsearch = { version = "8.5.0-alpha.1", optional = true }

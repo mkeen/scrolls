@@ -381,14 +381,12 @@ impl gasket::runtime::Worker for Worker {
     }
 
     fn bootstrap(&mut self) -> Result<(), gasket::error::Error> {
-        log::warn!("opening enrich databases");
         let enrich_db = sled::open(&self.config.db_path).or_retry()?;
         let rollback_db = sled::open(self.config.rollback_db_path.clone().unwrap_or_default()).or_retry()?;
 
         self.enrich_db = Some(enrich_db);
         self.rollback_db = Some(rollback_db);
 
-        log::warn!("finished opening enrich databases");
         Ok(())
     }
 

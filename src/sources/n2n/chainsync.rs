@@ -4,9 +4,7 @@ use pallas::network::miniprotocols::chainsync::{HeaderContent, Tip};
 use pallas::network::miniprotocols::{blockfetch, chainsync, Point};
 
 use gasket::error::AsWorkError;
-use log::log;
 use pallas::network::multiplexer::StdChannel;
-use sled::IVec;
 
 use crate::sources::n2n::transport::Transport;
 use crate::{crosscut, model, sources::utils, storage, Error};
@@ -95,7 +93,7 @@ impl Worker {
         Ok(())
     }
 
-    fn on_rollback(&mut self, point: &Point, tip: &Tip) -> Result<(), gasket::error::Error> {
+    fn on_rollback(&mut self, point: &Point) -> Result<(), gasket::error::Error> {
         match self.chain_buffer.roll_back(point) {
             chainsync::RollbackEffect::Handled => {
                 log::warn!("handled rollback within buffer {:?}", point);
@@ -154,7 +152,7 @@ impl Worker {
                 Ok(())
             }
             chainsync::NextResponse::RollBackward(p, t) => {
-                self.on_rollback(&p, &t)?;
+                self.on_rollback(&p)?;
                 self.chain_tip.set(t.1 as i64);
                 Ok(())
             }
@@ -201,8 +199,9 @@ impl gasket::runtime::Worker for Worker {
         let mut blocks_to_roll_back: Vec<Vec<u8>> = Vec::default();
 
         loop {
-            if let Ok(pop_rollback_block) = self.blocks.rollback_pop() {
-                if let Some(cbor) = pop_rollback_block {
+            match self.blocks.rollback_pop() {
+                None => break,
+                Some(cbor) => {
                     let block = MultiEraBlock::decode(&cbor)
                         .map_err(crate::Error::cbor)
                         .apply_policy(&self.policy);
@@ -220,10 +219,8 @@ impl gasket::runtime::Worker for Worker {
                             }
                         }
                     }
-                } else {
-                    break;
                 }
-            }
+            };
         }
 
         if rolled_back {

@@ -2,8 +2,6 @@ use clap;
 use scrolls::{bootstrap, crosscut, enrich, reducers, sources, storage};
 use serde::Deserialize;
 use std::time::Duration;
-use futures::executor::block_on;
-use tokio_util::sync::CancellationToken;
 
 use crate::console;
 
@@ -107,20 +105,7 @@ fn shutdown(pipeline: bootstrap::Pipeline) {
     }
 }
 
-#[inline]
-pub async fn process_shutting_down(proc_cancel: CancellationToken) -> bool {
-    let mut process_cancelled = false;
-
-    tokio::select! {
-        _ = proc_cancel.cancelled() => {
-            process_cancelled = true;
-        }
-    }
-
-    process_cancelled
-}
-
-pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::Error> {
+pub fn run(args: &Args) -> Result<(), scrolls::Error> {
 
     console::initialize(&args.console);
 
@@ -148,22 +133,16 @@ pub fn run(args: &Args, proc_cancel: CancellationToken) -> Result<(), scrolls::E
 
     let mut started_cancel = false;
 
-    while !started_cancel && !should_stop(&pipeline) {
+    while !should_stop(&pipeline) {
         console::refresh(&args.console, &pipeline);
-
-        if !started_cancel && block_on(process_shutting_down(proc_cancel.clone())) {
-            started_cancel = true
-        }
-
         std::thread::sleep(Duration::from_millis(1500));
     }
 
     log::error!("Scrolls is stopping...");
-    console::refresh(&args.console, &pipeline);
 
     shutdown(pipeline);
     blocks.close();
-    // todo flush connections for sled enricher
+    // todo make sure sled databases get flushed in their cleanup
 
     Ok(())
 }

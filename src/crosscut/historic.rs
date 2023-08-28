@@ -34,11 +34,8 @@ pub struct BufferBlocks {
 
 impl BufferBlocks {
     fn open_db(config: BlockConfig) -> Self {
-        log::warn!("opening scrolls block buffer from disk");
         let db = sled::open(config.db_path).or_retry().unwrap();
         let queue: Vec<Vec<u8>> = Vec::default();
-
-        log::warn!("finished opening scrolls block buffer from disk");
 
         BufferBlocks {
             db_depth: Some(db.len() as usize), // o(n) to get the initial size, but should only be called once
@@ -76,12 +73,12 @@ impl BufferBlocks {
         self.get_rollback_range(from).len()
     }
 
-    pub fn rollback_pop(&mut self) -> Result<Option<Vec<u8>>, Error> {
+    pub fn rollback_pop(&mut self) -> Option<Vec<u8>> {
         match self.queue.pop() {
-            None => Ok(None),
+            None => None,
             Some(popped) => {
-                self.get_db_ref().remove(popped.clone()).map_err(Error::storage);
-                Ok(Some(popped))
+                self.get_db_ref().remove(popped.clone()).map_err(Error::storage).expect("db error");
+                Some(popped)
             }
         }
     }
