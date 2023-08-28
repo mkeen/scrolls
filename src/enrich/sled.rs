@@ -189,29 +189,6 @@ fn prune_tree(db: &sled::Db) {
 }
 
 impl Worker {
-    fn clean_consumed_ring(&mut self) -> Option<()> {
-        let consumed_ring = self.db_ref_consumed_ring().unwrap();
-        match self.last_db_prune_time {
-            None => {
-                self.last_db_prune_time = Some(std::time::Instant::now());
-                Some(())
-            },
-            Some(last_pruned) => {
-                if last_pruned.elapsed() > Duration::from_secs(120) {
-                    // todo one day we will prune again
-                    //prune_tree(consumed_ring);
-                    self.last_db_prune_time = Some(std::time::Instant::now());
-                    Some(())
-                } else {
-                    None
-                }
-
-            }
-
-        }
-
-    }
-
     fn db_refs_all(&self) -> Result<Option<(&sled::Db, &sled::Db)>, ()> {
         match (self.db_ref_main(), self.db_ref_consumed_ring()) {
             (Some(db), Some(consumed_ring)) => {
@@ -413,7 +390,6 @@ impl gasket::runtime::Worker for Worker {
 
                     // and finally we remove utxos consumed by the block
                     self.remove_consumed_utxos(db, consumed_ring, &txs).expect("todo panic");
-                    self.clean_consumed_ring();
 
                     self.output
                         .send(model::EnrichedBlockPayload::roll_forward(cbor, ctx))?;
@@ -422,50 +398,36 @@ impl gasket::runtime::Worker for Worker {
                 model::RawBlockPayload::RollBack(cbor) => {
                     log::warn!("rolling back enrich data");
 
-                    if !cbor.is_empty() {
-                        let block = MultiEraBlock::decode(&cbor)
-                            .map_err(crate::Error::cbor)
-                            .apply_policy(&self.policy);
+                    let block = MultiEraBlock::decode(&cbor)
+                        .map_err(crate::Error::cbor)
+                        .apply_policy(&self.policy);
 
-                        match block {
-                            Ok(block) => {
-                                let block = match block {
-                                    Some(x) => x,
-                                    None => return Ok(gasket::runtime::WorkOutcome::Partial),
-                                };
+                    match block {
+                        Ok(block) => {
+                            let block = match block {
+                                Some(x) => x,
+                                None => return Ok(gasket::runtime::WorkOutcome::Partial),
+                            };
 
-                                let txs = block.txs();
+                            let txs = block.txs();
 
-                                // Revert Anything to do with this block
-                                self.remove_produced_utxos(db, &txs).expect("todo: panic error");
-                                self.replace_consumed_utxos(db, consumed_ring, &txs).expect("todo: panic error");
+                            // Revert Anything to do with this block
+                            self.remove_produced_utxos(db, &txs).expect("todo: panic error");
+                            self.replace_consumed_utxos(db, consumed_ring, &txs).expect("todo: panic error");
 
-                                ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
+                            ctx = self.par_fetch_referenced_utxos(db, &txs).or_restart()?;
 
-                                self.clean_consumed_ring();
-                            }
-                            Err(e) => {
-                                log::warn!("couldnt find rollback block {}", e);
-                            }
+                            self.output
+                                .send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
                         }
-                    } else {
-                        log::warn!("possibly sending dirty event back enrich data");
+                        Err(e) => {
+                            return Ok(gasket::runtime::WorkOutcome::Partial)
+                        }
                     }
-
-                    if !cbor.is_empty() {
-                        self.output
-                            .send(model::EnrichedBlockPayload::roll_back(cbor, ctx))?;
-                    } else {
-                        return Ok(gasket::runtime::WorkOutcome::Partial)
-                    }
-
 
                     self.blocks_counter.inc(1);
                 }
             };
-        } else {
-            log::warn!("skipping inserting utxos, no db yet");
-            return Err(gasket::error::Error::RetryableError("db not connected".into()))
         }
 
         self.input.commit();
