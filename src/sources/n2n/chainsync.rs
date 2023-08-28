@@ -105,11 +105,8 @@ impl Worker {
             chainsync::RollbackEffect::OutOfScope => {
                 if let Some(current_tip_block) = self.blocks.tip_block() {
                     if let Ok(block) = MultiEraBlock::decode(&current_tip_block) {
-                        if self.blocks.enqueue_rollback_batch(point) > 0 {
-                            self.chain_buffer.roll_forward(
-                                Point::Specific(block.slot(), block.hash().to_vec())
-                            )
-                        }
+                        self.blocks.enqueue_rollback_batch(point);
+                        self.chain_tip.set(Point::Specific(block.slot(), block.hash().to_vec()) as i64);
                     }
                 }
                 Ok(())
@@ -135,6 +132,7 @@ impl Worker {
             }
             chainsync::NextResponse::RollBackward(p, t) => {
                 self.on_rollback(&p)?;
+                log::warn!("setting tip {}", t.0.slot_or_default());
                 self.chain_tip.set(t.1 as i64);
                 Ok(())
             }
@@ -219,14 +217,9 @@ impl gasket::runtime::Worker for Worker {
                             self.block_count.inc(1);
 
                             if crosscut::should_finalize(&self.finalize, &Point::Specific(block.slot(), block.hash().to_vec())) {
-                                log::warn!("sending done");
-
                                 return Ok(gasket::runtime::WorkOutcome::Done);
                             }
-
                         }
-
-
                     }
                 } else {
                     break;
