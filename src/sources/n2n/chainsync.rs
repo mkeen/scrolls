@@ -217,6 +217,8 @@ impl gasket::runtime::Worker for Worker {
                         self.output.send(model::RawBlockPayload::roll_back(block))?;
                         self.block_count.inc(1);
                     }
+                } else {
+                    break
                 }
             } else {
                 break
