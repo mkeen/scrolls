@@ -59,14 +59,10 @@ impl Worker {
             model::CRDTCommand::block_starting(&block),
         ))?;
 
-        log::warn!("starting reduction rollback: {}", rollback);
-
         for reducer in self.reducers.iter_mut() {
             reducer.reduce_block(&block, ctx, rollback, &mut self.output)?;
             self.ops_count.inc(1);
         }
-
-        log::warn!("ending reduction");
 
         self.output.send(gasket::messaging::Message::from(
             model::CRDTCommand::block_finished(&block),
@@ -76,7 +72,6 @@ impl Worker {
     }
 
 }
-
 
 impl gasket::runtime::Worker for Worker {
     fn metrics(&self) -> gasket::metrics::Registry {
